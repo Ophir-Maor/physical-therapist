@@ -1,12 +1,14 @@
 # Everyday League — implementation handoff
 
-Updated November 13, 2026 (America/Los_Angeles). Local MVP for SanD Hacks. Project directory: `/Users/alinamaor/Documents/SanD Hacks/everyday-league`.
+Updated November 14, 2026 (America/Los_Angeles). Local MVP for SanD Hacks. Project directory: `/Users/alinamaor/Documents/SanD Hacks/everyday-league`.
+
+This is a movement-coaching prototype. It is not a medical device, does not diagnose injuries, and does not measure clinical recovery. Exercise scores are approximate and depend on camera visibility.
 
 ## Critical restrictions
 
-- User explicitly prohibits Git initialization, staging, commits, pushes, repository publication, PRs, and deployment until separately authorized.
-- Scaffold used `create-next-app ... --disable-git`; output confirmed “Skipping git initialization.” No Git operations were performed.
-- Local implementation, dependency installation, servers, testing, and asset downloads are authorized.
+- Git now exists in this directory. Branch `feature/gamified-coaching` was created from `main` (`20cdded`, “Initial Everyday League project”). The coaching work is **uncommitted**. Do not commit, push, force-push, delete branches, or deploy unless the user explicitly asks.
+- `main` tracks `origin/main`. Do not overwrite that history.
+- Local implementation, dependency installation, servers, and testing are authorized.
 - Keep this file current at the end of subsequent work. Read `AGENTS.md` before continuing.
 
 ## Run locally
@@ -17,100 +19,114 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000. Choose Start Broadcasting → Demo Mode → Enter Demo Arena → Start match. Default is two players, jumping jacks, 30 seconds. Match length can be 15, 30, or 60 seconds. Camera is requested only after selecting Live webcam and clicking Enable Camera. Browser camera access requires localhost or a secure context.
+Open http://localhost:3000.
 
-Optional real voice: copy `.env.example` to `.env.local`, enter `ELEVENLABS_API_KEY`, and restart Next.js. Optional voice/model IDs are documented in that example. No API credentials were provided or created. Missing credentials trigger explicit browser speech/captions fallback. Real voice sends short commentary text (including entered player names) to ElevenLabs; camera frames never leave the browser.
+- **Start Broadcasting** keeps the original timed arcade (jumping jacks or arm raises, rep count, three announcer personalities).
+- **Guided Coach** is the quality-scored practice flow.
+- **Progress** opens device-local session history.
+- Demo Mode needs neither a camera nor API keys. Live webcam is requested only after the user chooses it and continues.
 
-## Implemented
+Optional real voice: copy `.env.example` to `.env.local`, set `ELEVENLABS_API_KEY`, and restart Next.js. Optional per-personality voice IDs include `SUPPORTIVE`, `DRILL`, and `CALM` in addition to the original three. Missing credentials use labeled browser speech and captions. Camera frames never leave the browser.
 
-### Interface and flow
+Optional shared board: set `DATABASE_URL` to a Neon Postgres connection string and restart. Without it, `GET /api/leaderboard` returns `{ enabled: false }` and scores stay in `localStorage`. The route creates `leaderboard` if the database is reachable. Do not put that URL in a `NEXT_PUBLIC_` variable.
 
-- Original dark sports network aesthetic, lime branding, blue/red contenders, original SVG athlete artwork and neon demo skeletons. No external fonts or image CDN required.
-- Landing, match setup, calibration, three-second countdown with original Web Audio tones, live broadcast, winner/tie/practice results and humorous recap.
-- One/two players, bounded editable names, two activities, match duration, three announcer personalities.
-- Dominant video/canvas, scoreboard, timer, captions, commentary transcript, mute, readiness, diagnostics, reset/restart.
-- LocalStorage settings and last five results. Stored settings/history are shape-checked before use; malformed JSON is ignored. Demo results remain labeled.
-- Narrow viewport styles, keyboard focus indicators, reduced-motion support, accessible control labels.
+## What changed on November 14
 
-### Vision and activities
+The arcade path is still the landing headline, `GameEngine`, `ActivityDetector`, `PlayerTracker`, and the original three Playwright journeys in `tests/broadcast.spec.ts`.
 
-- `src/components/vision-stage.tsx`: dynamic client-side MediaPipe VIDEO inference, one/two poses, Lite model, GPU first and CPU fallback. RAF throttled to 20fps, no duplicate processing of unchanged video frames.
-- Matching video/canvas intrinsic dimensions and `object-fit: contain`, both mirrored consistently. Detection coordinates converted to screen coordinates before tracking, so player one starts preview-left.
-- Confidence-based visible skeleton, player color association, readiness checks, camera permission/missing/busy messages. Tracks, RAF, and model disposed on teardown, including asynchronous startup cancellation.
-- Model and package WASM files bundled under `public/mediapipe` (~35MB). Runtime does not download model from a third-party CDN.
-- `src/lib/engine.ts`: activity detectors independent of React. Configurable confidence, smoothing, geometry ratios, held-position debounce, minimum cycle duration, missing-data grace/reset. Closed → open → closed required for a rep.
-- Jumping jacks require shoulders/wrists/hips/ankles and arm/leg positions; arm raises require shoulders/wrists and do not require visible legs.
-- Spatial/temporal player association tolerates detection-array reordering and short disappearances; it is not biometric identification.
-- Demo Mode generates deterministic synthetic landmarks (roughly two-second and 2.7-second cycles) through the same detectors and scoring engine, not fabricated score increments.
+### Guided Movement Coach
 
-### Match engine
+`src/components/coach-flow.tsx` adds a second experience without copying the vision or voice stack:
 
-- Deterministic monotonic-timestamp engine for start, scoring, deadline, halfway, final ten seconds, milestones, ties, lead changes, winner and reset.
-- Core engine states idle/active/complete. Camera setup, calibration and countdown are React orchestration states rather than part of the core engine class.
-- Scores at or after the deadline are rejected. A separate interval checks wall-clock elapsed time even without pose detections. Briefly leaving the frame stops rep recognition but does not pause the clock.
-- UI renders engine snapshots; event IDs avoid replaying commentary.
+Choose exercise → watch an original looping skeleton → Demo Mode or webcam → calibrate → countdown → scored set → results → progress.
 
-### Voice
+Exercises: controlled arm raises, and conservative squats. Squats say explicitly that depth from one camera is approximate.
 
-- `src/app/api/tts/route.ts`: official ElevenLabs SDK, default `eleven_flash_v2_5`, browser-playable MP3, configurable voices/model, Zod validation, bounded request text/body, same-origin check, process-local burst limiter, provider timeout and sanitized failure responses.
-- `src/lib/commentary.ts`: event templates for hype/dry/documentary styles, introductions, leads, ties, every fifth rep, halftime/final ten and results. No LLM dependency or frame-level requests.
-- Bounded priority queue, deduplication, expiry, minimum start interval, serialized playback, interrupt/clear on final result, cancellation on reset/mute, bounded audio cache, gesture audio unlock.
-- Caption display begins on audio playback; browser fallback displays text and optionally speaks using browser speech synthesis. Provider unavailable state backs off for a minute.
-- Voice status explicitly distinguishes ElevenLabs and demo browser speech/captions.
+Coaches: Supportive, Drill Sergeant (opt-in, and it tells the user to stop if they feel pain), Hype Commentator, Calm Instructor. Arcade personalities `hype`, `dry`, and `documentary` still work. Drill Sergeant is not the arcade default.
 
-## Verification evidence
+Challenges: Practice, Form (highest average quality), Consistency (steadiness against that player's own target), Personal Best (only compared with similar on-device sessions). The timed arcade match remains separate.
 
-Commands run successfully against implemented code:
+Pause, resume, and stop are on the coached session. Stopping is always available. Motivational copy does not tell anyone to push through pain.
 
+### Form scoring
+
+`src/lib/form.ts` is independent of React. `FormEvaluator.update(landmarks, timestamp)` tracks a full down → raise/lower → return cycle and returns a structured repetition:
+
+- valid or not
+- scored or withheld
+- confidence
+- quality 0–100, or `null` when the camera cannot support a score
+- control, selected-target range, observable alignment, consistency
+- one coaching sentence and explicit reasons
+
+Default weights, documented as prototype defaults: control 40%, target range 30%, alignment 20%, consistency 10%. Missing metrics are omitted and the remaining weights are renormalized. Control and range are both required before a quality number is produced.
+
+Range reaches 100 at the selected target and does not increase if the person goes past it. Fast repetitions stay valid but score lower on control. Low-confidence or occluded repetitions are unscored rather than given a fake low grade.
+
+`RangeCalibrator` records one or two comfortable practice peaks. The user can keep 60–100% of that observed range. They can also accept a labeled conservative fallback (about 65° of arm elevation or 30° of knee flexion) if a practice rep is not available. That fallback is not described as their medical maximum.
+
+### Identity
+
+`src/lib/identity.ts` registers player 1 alone, then player 2 as a separate pose, then tracks by torso position. It does not use faces. Overlap or an unclear swap suspends scoring and asks for re-registration. A short disappearance keeps the previous anchors.
+
+Live two-player arcade matches use this registration before **Start match**. Demo Mode and solo arcade still use the original lane tracker so the existing broadcast tests can start immediately. Guided demo athletes are labeled synthetic and are not presented as a live registration.
+
+### Demo motion, history, leaderboard
+
+`src/lib/demo-motion.ts` drives the coach demo. Player 1 is a slower controlled cycle. Player 2 is a faster, less even cycle. The same form engine scores both, and tests require the controlled average to win even with fewer repetitions.
+
+`src/lib/progress.ts` stores up to 30 sessions in `el-sessions` (exercise, time, coach, reps, qualities, average, consistency, target, duration, demo flag). Personal bests compare only coach sessions with the same exercise, challenge, demo flag, and a target within 10%. Achievements: Five Quality Reps, Smooth Operator, Consistency King, Personal Best, Comeback Champion. Arcade results still use `el-history` and also append a timed session record.
+
+`POST /api/leaderboard` rejects synthetic sessions, validates nickname and score, and rate-limits per process. It stores nickname, exercise, challenge, average, and rep count. No poses or video.
+
+## Verification on November 14
+
+Passed in this session:
+
+- `npm test`: **49 tests passed across 7 files**. Includes the original detector, clock, tracker, commentary, and TTS cases, plus form quality versus speed, overshoot, occlusion, low confidence, noise, calibration targets, squat uncertainty, identity registration and overlap, progress and achievements, coach personality safety copy, and leaderboard rejection when Neon is unset.
 - `npm run typecheck`: TypeScript passed.
-- `npm run lint`: ESLint passed. Bundled third-party MediaPipe JavaScript is excluded from app linting.
-- `npm test`: **28 tests passed across 3 files**. Covers full cycles in both modes, noise/holds, missing and low-confidence landmarks, jump legs requirement, timer/deadline/score events, ties/winners/reset, pose reordering/occlusion association, queue expiry/deduplication/prioritization, mocked audio serialization/interruption/mute, API malformed/oversized/invalid requests, same-origin rejection, missing configuration, mocked provider success/failure, rate-limit recovery.
-- `npm run test:e2e`: **3 Chromium tests passed**. Two-player jumping-jack demo traverses landing/setup/countdown/match/results/restart with nonzero scores for both and no page errors. Solo arm-raise demo completes on 390px viewport with nonzero score and no horizontal overflow. Simulated camera permission denial disables start and recovers to Demo Mode.
-- Final targeted rerun of the two-player browser journey also passed after adding a nonempty commentary-transcript assertion; final typecheck, lint, 28 unit/API tests, and build were rerun successfully.
-- `npm run build`: production compilation, TypeScript, prerender and route generation passed with Webpack. `/` static; `/api/tts` dynamic.
-- Browser screenshots captured at `test-results/landing.png`, `broadcast.png`, `results.png`. Landing, broadcast, and results screenshots were visually inspected. Artifacts are ignored; rerunning Playwright replaces them.
-- Installed MediaPipe and ElevenLabs API signatures inspected and official docs consulted. Provider success in tests is mocked, NOT a live ElevenLabs verification.
+- `npm run lint`: ESLint passed again after the smoothness pass (lower camera rate, cached demo background, no per-frame scoreboard renders, coach phase updates written to the DOM).
+- `npm run build`: Webpack production build passed before the smoothness pass. `/` static. `/api/tts` and `/api/leaderboard` dynamic. The production build was not rerun after the smoothness edits.
 
-Environment: Node 24.22.3, npm 11.19.1; Next.js 16.4.6, React 19.3.0, MediaPipe tasks-vision 1.2.3. Exact installed versions are in package-lock.json. Chromium downloaded through Playwright.
+Not passed here:
 
-## Environment issues resolved / remaining
+- `npm run test:e2e` did **not** run to completion. Playwright’s Chromium process died in the agent sandbox (`bootstrap_check_in` permission denied). `tests/coach.spec.ts` is new and unverified in a browser. The three original broadcast tests were not re-executed successfully in this session.
+- The in-editor browser was not available to click through the new flow (tool approval timed out).
+- No new physical webcam session and no live ElevenLabs call were run. Earlier manual webcam testing, recorded before this change, does not validate the new quality thresholds or squat geometry.
 
-- Scaffold Node 20 type definitions conflicted with current Vitest; updated `@types/node` to Node 24.
-- Scaffold enabled Cache Components, incompatible with explicit route runtime config; disabled because this local app does not require it.
-- Turbopack production CSS processing hit an environment worker-port permission panic even after escalation. Switched both dev/build scripts to supported `--webpack`, using Tailwind PostCSS. Webpack production build passed. This is a resolved build workaround, not a product feature.
-- Initial browser run was interrupted by a config/server restart during development; the clean run passed all three tests.
-- `npm audit` reports **7 moderate findings**, all in development ESLint/typescript-eslint dependency chain through minimatch (GHSA-g3hv-75wg-m249). Compatible `npm audit fix` did not clear them. No high/critical reported. Do not claim a clean audit; review upstream updates before publishing. No forced major overrides were introduced.
+## Known limitations
 
-## Known limitations and unverified behavior
-
-1. **No physical webcam trial performed.** Real camera acquisition, GPU/CPU inference, alignment and detector accuracy are implemented but require testing with actual humans, lighting, clothing, distance and available space. Synthetic fixtures cannot establish exercise-form accuracy.
-2. **No live ElevenLabs generation or audible speaker test performed.** Missing credentials and provider mocks are tested. Check chosen voice availability, latency, browser autoplay, queue behavior, volume and captions on demo laptop.
-3. Spatial identities can swap if players cross or remain occluded for long periods. Keep each player in the assigned lane. Do not claim robust identity across crossings.
-4. Detection runs synchronously on the main thread at up to 20fps. Worker offloading not implemented; measure low-end laptop performance before adding complexity.
-5. Calibration verifies required landmarks are currently confident; it does not calibrate custom body thresholds or require a sustained ready dwell. Threshold tuning needs real footage/manual observation. Geometry uses normalized image coordinates; camera aspect and posture can affect practical thresholds.
-6. Browser speech support/voices differ by environment. Captions remain the reliable fallback. Cold dev compilation can delay the first TTS request; warm production startup for demonstrations.
-7. Match timer continues if tab is hidden; stale speech is canceled on visibility loss. There is no pause/resume flow.
-8. API rate limiter/cache are process-local, without authentication or shared quota enforcement. Appropriate for requested local MVP, not a publicly exposed paid API proxy.
-9. Optional OpenAI/LLM-written commentary, audio streaming, replay recording, downloadable recap, and additional sports are not implemented. Recap and commentary are contextual templates.
-10. No measured accessibility audit or cross-browser certification. Automated browser coverage is Chromium; physical desktop Chrome is primary target.
-11. Scores update immediately, but there is no elaborate animated score transition or separate event-banner animation; captions/transcript carry event narrative.
+1. Form scores are heuristics. They are not a clinical grade. Squats are the less reliable of the two exercises because a single webcam cannot see depth well. Alignment is withheld when both sides are not visible.
+2. Calibration uses the range the camera just saw. It does not know whether that range is medically appropriate.
+3. Live two-player identity is spatial. Crossing or standing on top of each other pauses scoring. Demo Mode does not prove live registration.
+4. Coach demo trajectories are deterministic scripts, not recorded humans. A higher demo score does not prove real-world accuracy.
+5. Pose inference stays on the main thread. The camera loop now targets about 12 frames per second at 640×480, and the demo loop about 30. The court background is cached, skeleton shadows are off, and scoreboard React updates happen when the score or displayed second changes rather than on every frame. A worker is still not used.
+6. The match and coach timers do not have a shared pause model. Arcade still has no pause. Coach pause freezes demo motion and stops feeding the evaluator; the clock subtracts paused time.
+7. Speech rate limiting, the audio cache, and the leaderboard limiter are process-local. There is no login. Browser-submitted scores can be forged. Do not treat the board as officiated.
+8. `npm audit` was not re-run. The previous handoff reported 7 moderate findings in the dev ESLint chain. Do not claim a clean audit.
+9. Git changes are uncommitted on `feature/gamified-coaching`.
 
 ## Next recommended steps
 
-1. Run one-person arm raises on the actual laptop, then full-body jumping jacks. Check at least ten cycles manually against counts; test incomplete reps, hands-only motion, leaving/re-entering frame and reset.
-2. Run two-person side-by-side matches. Confirm preview-left maps to Player 1 and overlay colors/scores stay consistent when MediaPipe ordering changes. Avoid crossings; test brief missing-player recovery.
-3. Configure ElevenLabs, run a short match with headphones/speakers, verify model/voice IDs, MP3 playback and priority interruption. Try network loss and mute/unmute. Warm one API request before presenting.
-4. Tune confidence/hold/geometry thresholds only from observed failures and add regression fixtures/tests for each change.
-5. Rehearse `docs/DEMO_SCRIPT.md`: 30-second real match, quick results, immediate labeled demo fallback if the room/camera fails.
-6. Resolve dev dependency advisory chain through upstream compatible releases. Only after explicit user authorization consider Git initialization/commit and deployment preparation.
+1. Run `npm run test:e2e` on the demo machine, outside any sandbox, and watch the guided demo through results. Confirm the controlled athlete’s average is visibly higher than a two-player rushed demo.
+2. On a real camera, compare ten slow arm raises with the score, then try a deliberately fast set. Adjust thresholds only from those failures and add a fixture for each change.
+3. Repeat with a conservative squat. Expect more “unscored” results when feet or hips leave the frame.
+4. Register two people without crossing. Confirm preview-left stays player 1 after MediaPipe reorders poses.
+5. If a Neon URL is available, restart and submit one non-demo score. Confirm synthetic sessions are refused.
+6. Commit and push only after the user asks. Do not deploy until they ask, and do not expose the TTS or leaderboard routes publicly without authentication.
 
 ## File map
 
-- `src/app/page.tsx`: UI orchestration and all five screens.
-- `src/app/globals.css`: broadcast design and responsive styles.
-- `src/components/vision-stage.tsx`: webcam/model/demo/canvas lifecycle.
-- `src/lib/engine.ts` and `.test.ts`: detectors, tracker, game, synthetic fixtures.
-- `src/lib/commentary.ts` and `.test.ts`: template and voice queue/playback.
-- `src/app/api/tts/route.ts` and `.test.ts`: server synthesis/validation.
-- `tests/broadcast.spec.ts`: browser journeys and screenshots.
-- `README.md`, `AGENTS.md`, `.env.example`, `docs/ARCHITECTURE.md`, `docs/DEMO_SCRIPT.md`, `docs/ROADMAP.md`: continuing context.
+- `src/app/page.tsx`: arcade UI, live two-player registration, entry to coach and progress.
+- `src/components/coach-flow.tsx`: guided session, calibration, results.
+- `src/components/exercise-demo.tsx`: original looping skeleton.
+- `src/components/vision-stage.tsx`: webcam, arcade demo, coach demo, ghost overlay.
+- `src/lib/engine.ts`: arcade detectors, lane tracker, timed match.
+- `src/lib/form.ts`, `geometry.ts`: quality scoring and pose math.
+- `src/lib/identity.ts`: sequential registration.
+- `src/lib/demo-motion.ts`: controlled versus rushed synthetic motion.
+- `src/lib/progress.ts`: device history, personal bests, achievements.
+- `src/lib/commentary.ts`: arcade lines and coach personalities.
+- `src/app/api/tts/route.ts`: ElevenLabs, now including the four coach personalities.
+- `src/app/api/leaderboard/route.ts`: optional Neon board.
+- `tests/broadcast.spec.ts`: original arcade journeys. `tests/coach.spec.ts`: guided demo journey, not yet executed here.

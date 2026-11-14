@@ -17,6 +17,7 @@ import {
   Zap,
 } from "lucide-react";
 import VisionStage from "@/components/vision-stage";
+import CoachFlow from "@/components/coach-flow";
 import {
   ActivityDetector,
   GameEngine,
@@ -25,9 +26,17 @@ import {
   type Mode,
 } from "@/lib/engine";
 import { BroadcastVoice, commentaryFor } from "@/lib/commentary";
+import { IdentityRegistrar } from "@/lib/identity";
+import { saveSession } from "@/lib/progress";
 
 type Phase =
-  "landing" | "setup" | "calibration" | "countdown" | "active" | "complete";
+  | "landing"
+  | "setup"
+  | "calibration"
+  | "countdown"
+  | "active"
+  | "complete"
+  | "coach";
 type Settings = {
   names: string[];
   players: number;
@@ -50,6 +59,7 @@ const activity = (mode: Mode) =>
     : "Arm Raise Championship";
 export default function Home() {
   const [phase, setPhase] = useState<Phase>("landing");
+  const [coachStep, setCoachStep] = useState<"setup" | "progress">("setup");
   const [settings, setSettings] = useState<Settings>(defaults);
   const [scores, setScores] = useState([0, 0]);
   const [winner, setWinner] = useState<number | null>(null);
@@ -74,12 +84,27 @@ export default function Home() {
   const engine = useRef<GameEngine | null>(null);
   const detectors = useRef<ActivityDetector[]>([]);
   const tracker = useRef<PlayerTracker | null>(null);
+  const registrar = useRef<IdentityRegistrar | null>(null);
+  const painted = useRef<(Landmark[] | null)[] | null>(null);
   const voice = useRef<BroadcastVoice | null>(null);
   const processed = useRef(0);
   const phaseRef = useRef(phase);
   const settingsRef = useRef(settings);
   const audio = useRef<AudioContext | null>(null);
   const lastDebug = useRef(0);
+  const regKey = useRef("");
+  const debugRef = useRef(debug);
+  useEffect(() => {
+    debugRef.current = debug;
+  }, [debug]);
+  const [enrolled, setEnrolled] = useState(true);
+  const [registering, setRegistering] = useState(false);
+  const [regStage, setRegStage] = useState<"await-1" | "await-2" | "tracking">(
+    "await-1",
+  );
+  const [regReady, setRegReady] = useState(false);
+  const [regMessage, setRegMessage] = useState("");
+  const [regAmbiguous, setRegAmbiguous] = useState(false);
   useEffect(() => {
     phaseRef.current = phase;
   }, [phase]);
@@ -146,8 +171,17 @@ export default function Home() {
   const consume = useCallback(() => {
     const game = engine.current;
     if (!game) return;
-    setScores([...game.scores]);
-    setRemaining(game.remaining);
+    setScores((previous) =>
+      previous.length === game.scores.length &&
+      previous.every((score, index) => score === game.scores[index])
+        ? previous
+        : [...game.scores],
+    );
+    setRemaining((previous) =>
+      Math.ceil(previous) === Math.ceil(game.remaining)
+        ? previous
+        : game.remaining,
+    );
     for (const event of game.events.slice(processed.current)) {
       const s = settingsRef.current;
       const text = commentaryFor(
@@ -184,6 +218,22 @@ export default function Home() {
         scores: [...game.scores],
         demo: settingsRef.current.demo,
       };
+      saveSession({
+        id: `${Date.now()}`,
+        at: new Date().toISOString(),
+        experience: "arcade",
+        exercise: settingsRef.current.mode,
+        challenge: "timed",
+        personality: settingsRef.current.personality,
+        names: entry.names,
+        reps: entry.scores,
+        qualities: [],
+        average: null,
+        consistency: null,
+        target: null,
+        durationSec: settingsRef.current.duration,
+        demo: entry.demo,
+      });
       setHistory((old) => {
         const next = [entry, ...old].slice(0, 5);
         try {
@@ -229,10 +279,32 @@ export default function Home() {
     }, 1000);
     return () => clearInterval(id);
   }, [phase, consume, sound]);
+  const overlay = useCallback(() => painted.current, []);
   const onPoses = useCallback(
     (poses: Landmark[][], timestamp: number) => {
-      const assigned = tracker.current?.update(poses, timestamp) || [];
-      if (timestamp - lastDebug.current > 250) {
+      let assigned = tracker.current?.update(poses, timestamp) || [];
+      if (registrar.current) {
+        const observed = registrar.current.update(poses, timestamp);
+        assigned = observed.assigned;
+        const key = `${registrar.current.stage}|${observed.readyToConfirm}|${observed.ambiguous}|${observed.message}`;
+        if (regKey.current !== key) {
+          regKey.current = key;
+          setRegMessage(observed.message);
+          setRegReady(observed.readyToConfirm);
+          setRegAmbiguous(observed.ambiguous);
+          setRegStage(registrar.current.stage);
+          setEnrolled(registrar.current.stage === "tracking");
+        }
+        if (
+          phaseRef.current === "active" &&
+          (registrar.current.stage !== "tracking" || observed.ambiguous)
+        ) {
+          painted.current = assigned;
+          return;
+        }
+      }
+      painted.current = assigned;
+      if (debugRef.current && timestamp - lastDebug.current > 250) {
         lastDebug.current = timestamp;
         setDiagnostics(
           assigned.map(
@@ -283,6 +355,19 @@ export default function Home() {
       players: clean.names.slice(0, clean.players),
     });
     tracker.current = new PlayerTracker(clean.players);
+    registrar.current =
+      !clean.demo && clean.players === 2 ? new IdentityRegistrar(2) : null;
+    regKey.current = "";
+    setRegistering(Boolean(registrar.current));
+    setRegStage("await-1");
+    setEnrolled(clean.demo || clean.players === 1);
+    setRegReady(false);
+    setRegAmbiguous(false);
+    setRegMessage(
+      registrar.current
+        ? "Player 1, step into the frame alone."
+        : "",
+    );
     detectors.current = Array.from(
       { length: clean.players },
       () => new ActivityDetector(clean.mode),
@@ -345,12 +430,32 @@ export default function Home() {
               </h1>
               <p>
                 Your room. Your rivals. Your ridiculously dramatic AI
-                sportscaster. Turn a few jumping jacks into the championship
-                nobody knew they needed.
+                sportscaster. Or switch to guided coaching, where control beats
+                a pile of sloppy repetitions.
               </p>
-              <button className="primary" onClick={() => setPhase("setup")}>
-                Start Broadcasting <ArrowRight size={19} />
-              </button>
+              <div className="hero-actions">
+                <button className="primary" onClick={() => setPhase("setup")}>
+                  Start Broadcasting <ArrowRight size={19} />
+                </button>
+                <button
+                  className="secondary"
+                  onClick={() => {
+                    setCoachStep("setup");
+                    setPhase("coach");
+                  }}
+                >
+                  Guided Coach
+                </button>
+                <button
+                  className="text-button"
+                  onClick={() => {
+                    setCoachStep("progress");
+                    setPhase("coach");
+                  }}
+                >
+                  Progress
+                </button>
+              </div>
               <div className="hero-meta">
                 <span>
                   <Camera size={15} /> Just bring a webcam
@@ -625,6 +730,9 @@ export default function Home() {
               <small className="privacy">
                 Camera footage stays on this device.
               </small>
+              <button className="text-button" onClick={() => setPhase("coach")}>
+                Switch to guided coach
+              </button>
             </aside>
           </div>
           {history.length > 0 && (
@@ -693,6 +801,7 @@ export default function Home() {
                 players={settings.players}
                 mode={settings.mode}
                 running={phase === "active"}
+                overlay={registering ? overlay : undefined}
                 onPoses={onPoses}
                 onStatus={onStatus}
               />
@@ -725,13 +834,34 @@ export default function Home() {
                     <p className="status-text" role="status">
                       {status}
                     </p>
+                    {regMessage && <p>{regMessage}</p>}
                     <small>
-                      Player 1 starts on the left of the preview. Stay in your
-                      lane.
+                      Player 1 starts on the left of the preview. Live
+                      two-player matches register one person at a time. Stay in
+                      your lane after that.
                     </small>
+                    {registering && !enrolled && (
+                      <button
+                        className="secondary"
+                        disabled={!regReady}
+                        onClick={() => {
+                          if (!registrar.current?.confirm(performance.now()))
+                            return;
+                          const stage = registrar.current?.stage ?? "await-1";
+                          setRegStage(stage);
+                          setEnrolled(stage === "tracking");
+                          setRegReady(false);
+                        }}
+                      >
+                        Confirm{" "}
+                        {regStage === "await-2"
+                          ? settings.names[1]
+                          : settings.names[0]}
+                      </button>
+                    )}
                     <button
                       className="primary"
-                      disabled={!ready}
+                      disabled={!ready || !enrolled}
                       onClick={() => {
                         voice.current?.enqueue(
                           `${settings.names.slice(0, settings.players).join(" versus ")}. Welcome to the ${activity(settings.mode)}!`,
@@ -804,8 +934,23 @@ export default function Home() {
                 </span>
                 <small>
                   Counted reps require a full closed → open → closed cycle.
+                  {regAmbiguous
+                    ? " Scoring is paused while the players are ambiguous."
+                    : ""}
                 </small>
               </div>
+              {regAmbiguous && (
+                <button
+                  className="secondary"
+                  onClick={() => {
+                    registrar.current?.reregister();
+                    setEnrolled(false);
+                    setPhase("calibration");
+                  }}
+                >
+                  Re-register players
+                </button>
+              )}
             </aside>
           </div>
           <button
@@ -875,12 +1020,20 @@ export default function Home() {
           </details>
         </section>
       )}
+      {phase === "coach" && (
+        <CoachFlow
+          key={coachStep}
+          initialStep={coachStep}
+          onExit={() => setPhase("landing")}
+          onArcade={() => setPhase("setup")}
+        />
+      )}
       <footer>
         <span>
           EVERYDAY LEAGUE <b>© 2026</b>
         </span>
         <span>
-          <CircleHelp size={13} /> No athletic ability implied.
+          <CircleHelp size={13} /> Experimental scores. Not a medical device.
         </span>
         <span>BUILT FOR THE UNREMARKABLE.</span>
       </footer>
