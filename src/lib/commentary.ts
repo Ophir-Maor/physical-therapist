@@ -1,6 +1,20 @@
 import type { GameEvent } from "./engine";
 
-export type Personality = "hype" | "dry" | "documentary";
+export type Personality =
+  | "hype"
+  | "dry"
+  | "documentary"
+  | "supportive"
+  | "drill"
+  | "calm";
+const column = {
+  hype: 0,
+  drill: 0,
+  dry: 1,
+  supportive: 1,
+  documentary: 2,
+  calm: 2,
+} as const;
 export function commentaryFor(
   event: GameEvent,
   names: string[],
@@ -56,11 +70,67 @@ export function commentaryFor(
           ],
   };
   if (event.type === "REP_COMPLETED" && score > 0 && score % 5 === 0)
-    return `${player} reaches ${score}! ${personality === "hype" ? "An unstoppable household force!" : personality === "dry" ? "The numbers are getting impressively larger." : "A sustained display of coordination."}`;
-  return (
-    lines[event.type]?.[{ hype: 0, dry: 1, documentary: 2 }[personality]] ??
-    null
-  );
+    return `${player} reaches ${score}! ${column[personality] === 0 ? "An unstoppable household force!" : column[personality] === 1 ? "The numbers are getting impressively larger." : "A sustained display of coordination."}`;
+  return lines[event.type]?.[column[personality]] ?? null;
+}
+
+export type CoachPersonality = "supportive" | "drill" | "hype" | "calm";
+export function coachCommentary(input: {
+  type: "intro" | "rep" | "visibility" | "done" | "stop";
+  personality: CoachPersonality;
+  name: string;
+  quality?: number | null;
+  feedback?: string;
+  average?: number | null;
+}) {
+  const feedback = input.feedback || "Move only through a comfortable range.";
+  const quality =
+    input.quality == null ? "unscored" : String(Math.round(input.quality));
+  const average =
+    input.average == null ? "an unscored set" : `${Math.round(input.average)}`;
+  const lines: Record<CoachPersonality, Record<typeof input.type, string>> = {
+    supportive: {
+      intro: `${input.name}, we'll score control and your selected target. Stop if anything feels painful.`,
+      rep:
+        quality === "unscored"
+          ? `${input.name}, I won't score that one. ${feedback}`
+          : `${input.name}, that was a ${quality}. ${feedback}`,
+      visibility: `${input.name}, ${feedback}`,
+      done: `${input.name}, session complete with ${average}. Quality counted more than speed. This is not a medical assessment.`,
+      stop: `${input.name}, session stopped. Stopping is the right call whenever you want, especially if something hurts.`,
+    },
+    drill: {
+      intro: `${input.name}! WE WANT CONTROL, NOT CHAOS. STOP IMMEDIATELY IF YOU FEEL PAIN.`,
+      rep:
+        quality === "unscored"
+          ? `NO SCORE. I COULD NOT SEE IT. ${feedback.toUpperCase()}`
+          : `THAT WAS A ${quality}. ${feedback.toUpperCase()}`,
+      visibility: `HOLD UP. ${feedback.toUpperCase()}`,
+      done: `SET COMPLETE. AVERAGE ${average}. WE DO NOT CHASE PAIN, AND THIS IS NOT A CLINICAL GRADE.`,
+      stop: `SESSION STOPPED. GOOD. NEVER TRAIN THROUGH PAIN FOR THIS APP.`,
+    },
+    hype: {
+      intro: `${input.name} steps up! The judges are scoring control, not chaos. Stop if you feel pain.`,
+      rep:
+        quality === "unscored"
+          ? `NO SCORE ON THE BOARD. ${feedback}`
+          : `A ${quality} FROM THE JUDGES! ${feedback}`,
+      visibility: `THE CAMERA LOST THE ANGLE. ${feedback}`,
+      done: `THE SET IS IN THE BOOKS AT ${average}! Smoothness gets the highlight. Not a medical verdict.`,
+      stop: `THE SESSION ENDS ON REQUEST. A smart stop is still a championship decision.`,
+    },
+    calm: {
+      intro: `${input.name}: raise or lower to your selected target, then return slowly. Stop if you feel pain.`,
+      rep:
+        quality === "unscored"
+          ? `Not scored. ${feedback}`
+          : `${feedback} Score ${quality}.`,
+      visibility: feedback,
+      done: `Session complete. Average ${average}. This score is experimental, not a clinical measure.`,
+      stop: `Session stopped. You can end a set at any time.`,
+    },
+  };
+  return lines[input.personality][input.type];
 }
 
 interface Line {
@@ -250,7 +320,14 @@ export class BroadcastVoice {
       }
       let settled = false;
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = this.personality === "hype" ? 1.15 : 1;
+      utterance.rate =
+        this.personality === "hype"
+          ? 1.12
+          : this.personality === "drill"
+            ? 1.04
+            : this.personality === "calm"
+              ? 0.96
+              : 1;
       const timeout = setTimeout(() => {
         window.speechSynthesis.cancel();
         finish();

@@ -1,29 +1,25 @@
 # Roadmap by demonstration impact
 
-## 1. Physical rehearsal and scoring accuracy
+## Done on `feature/gamified-coaching`
 
-Test one-player arm raises first, then jumping jacks, then two-player versus on the actual demo laptop/camera. Compare manually observed repetitions with counted repetitions. Verify mirrored overlay alignment, both screen lanes, small/big participants, varied distance and lighting, partial occlusions, low confidence, and leaving/re-entering frame. Record detector threshold changes and regression fixtures. No exercise-form accuracy claim is justified by synthetic tests.
+Guided coach, arm-raise and conservative squat scoring, calibration against a demonstrated range, four coach personalities, sequential live registration, form and consistency challenges, device history, achievements, a controlled-versus-rushed demo, and an optional Neon leaderboard that stays off without `DATABASE_URL`. The timed arcade broadcast is still in the app. The work is not committed.
 
-## 2. Real ElevenLabs and room audio
+## 1. Prove it on the demo laptop
 
-Configure credentials and suitable available voice IDs. Verify actual SDK synthesis, latency, MP3 playback, captions, cancellation at the final whistle, and all personalities. Test denied autoplay, mute/unmute, offline/failing API, and fallback labeling. Tune commentary brevity and priorities so victory arrives promptly in a short match.
+Run `npm run test:e2e` outside a sandbox. Then rehearse slow arm raises against a deliberately fast set and confirm the quality gap matches what you see. Repeat for a shallow squat. Record any threshold change with a new fixture. Synthetic confidence is not real-world accuracy.
 
-## 3. Rehearse the crowded-room fallback
+## 2. Real voice in the room
 
-Run several consecutive 15/30/60-second matches, solo and versus, both activities. Test denied/busy/missing cameras and recovery. Validate switching to practice and synthetic mode without leaking camera tracks or stale speech. Rehearse the three-minute script with the actual projector and speakers.
+Configure ElevenLabs and confirm the coach voices, mute, and the caption fallback. Warm one request before presenting.
 
-## 4. Improve identity and calibration
+## 3. Two people, without crossing
 
-Current association is spatial and becomes ambiguous during crossings or long occlusion. Add explicit lane guidance or calibration locks before considering more complex tracking. Consider a brief sustained readiness requirement and show per-player readiness rather than only a combined status. Improve empty/corrupt local-history validation if expanding persistence.
+Register left, then right. Confirm the colors survive a brief step out of frame, and that crossing pauses scoring. Keep that limit in the spoken demo.
 
-## 5. Profile and optimize only where measured
+## 4. Neon only if a URL is available
 
-Measure MediaPipe main-thread inference time and UI responsiveness on the demo hardware. The current loop targets approximately 20 Hz. Move inference to a Web Worker only if supported browser APIs and measured stalls justify the complexity. Reuse demo canvas dimensions rather than reassigning each frame if profiling shows overhead.
+Restart with `DATABASE_URL`, submit one real nickname and score, and show that a demo session cannot be uploaded. The board is not cheat-proof.
 
-## 6. Optional enhancements after the core is reliable
+## Still later
 
-A structured, server-only LLM commentary endpoint for significant events is not implemented and is lower priority than live accuracy. Additional games, richer replay/history, word-level captions, and low-latency streaming are also future work. Keep templates and buffered MP3 fallback even if optional features are introduced.
-
-## Public service work is out of scope
-
-No deployment is authorized. Before any future public use, separately authorize deployment and address authentication, paid-API abuse protection, distributed limits, request-body streaming limits, privacy disclosures, and operational monitoring. The current origin check and process-local limiter are intended only for local demonstration.
+Worker inference, a longer calibration dwell, word-level captions, and any public deployment. Public hosting needs authentication, paid-API protection, and a privacy note. No deployment is authorized.
