@@ -5,7 +5,9 @@ export const runtime = "nodejs";
 const schema = z
   .object({
     text: z.string().trim().min(1).max(400),
-    personality: z.enum(["hype", "dry", "documentary"]).default("hype"),
+    personality: z
+      .enum(["hype", "dry", "documentary", "supportive", "drill", "calm"])
+      .default("hype"),
   })
   .strict();
 // Local demo protection, not a distributed production rate limiter.

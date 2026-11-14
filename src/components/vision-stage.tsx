@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import type { PoseLandmarker } from "@mediapipe/tasks-vision";
+import { demoFrame } from "@/lib/demo-motion";
 import {
   PlayerTracker,
   syntheticPose,
   type Landmark,
   type Mode,
 } from "@/lib/engine";
+import type { ExerciseId } from "@/lib/form";
 
 type Props = {
   demo: boolean;
@@ -16,6 +18,12 @@ type Props = {
   running: boolean;
   onPoses: (poses: Landmark[][], timestamp: number) => void;
   onStatus: (message: string, ready: boolean) => void;
+  exercise?: ExerciseId | "jumping-jacks";
+  demoMotion?: "arcade" | "coach";
+  demoPlaying?: boolean;
+  ghost?: Landmark[] | null;
+  ghostRef?: { current: Landmark[] | null };
+  overlay?: () => (Landmark[] | null)[] | null;
 };
 
 const CONNECTIONS = [
@@ -43,50 +51,43 @@ function drawPose(
   pose: Landmark[],
   color: string,
   demo: boolean,
+  mirror = false,
 ) {
   const width = ctx.canvas.width;
   const height = ctx.canvas.height;
   const visible = (i: number) => pose[i] && (pose[i].visibility ?? 1) >= 0.5;
+  const xAt = (point: Landmark) => (mirror ? 1 - point.x : point.x) * width;
   ctx.strokeStyle = color;
   ctx.fillStyle = color;
-  ctx.lineWidth = demo ? 7 : 4;
+  ctx.lineWidth = demo ? 6 : 3;
   ctx.lineCap = "round";
-  ctx.shadowColor = color;
-  ctx.shadowBlur = demo ? 22 : 8;
   for (const [a, b] of CONNECTIONS) {
     if (!visible(a) || !visible(b)) continue;
     ctx.beginPath();
-    ctx.moveTo(pose[a].x * width, pose[a].y * height);
-    ctx.lineTo(pose[b].x * width, pose[b].y * height);
+    ctx.moveTo(xAt(pose[a]), pose[a].y * height);
+    ctx.lineTo(xAt(pose[b]), pose[b].y * height);
     ctx.stroke();
   }
   for (const i of [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28]) {
     if (!visible(i)) continue;
     ctx.beginPath();
-    ctx.arc(
-      pose[i].x * width,
-      pose[i].y * height,
-      demo ? 7 : 4,
-      0,
-      Math.PI * 2,
-    );
+    ctx.arc(xAt(pose[i]), pose[i].y * height, demo ? 6 : 3.5, 0, Math.PI * 2);
     ctx.fill();
   }
   if (demo && visible(0)) {
     if (visible(11) && visible(12)) {
       ctx.beginPath();
-      ctx.moveTo(pose[0].x * width, pose[0].y * height + 24);
+      ctx.moveTo(xAt(pose[0]), pose[0].y * height + 24);
       ctx.lineTo(
-        ((pose[11].x + pose[12].x) * width) / 2,
+        (xAt(pose[11]) + xAt(pose[12])) / 2,
         ((pose[11].y + pose[12].y) * height) / 2,
       );
       ctx.stroke();
     }
     ctx.beginPath();
-    ctx.arc(pose[0].x * width, pose[0].y * height, 24, 0, Math.PI * 2);
+    ctx.arc(xAt(pose[0]), pose[0].y * height, 18, 0, Math.PI * 2);
     ctx.stroke();
   }
-  ctx.shadowBlur = 0;
 }
 
 function drawCourt(ctx: CanvasRenderingContext2D) {
@@ -120,20 +121,59 @@ function drawCourt(ctx: CanvasRenderingContext2D) {
 }
 
 /** Camera frames stay in this component and never leave the browser. */
-export default function VisionStage({
+function VisionStage({
   demo,
   players,
   mode,
   running,
   onPoses,
   onStatus,
+  exercise,
+  demoMotion = "arcade",
+  demoPlaying = false,
+  ghost = null,
+  ghostRef,
+  overlay,
 }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const live = useRef({ onPoses, onStatus, running, mode });
+  const live = useRef({
+    onPoses,
+    onStatus,
+    running,
+    mode,
+    exercise,
+    demoMotion,
+    demoPlaying,
+    ghost,
+    ghostRef,
+    overlay,
+  });
   useEffect(() => {
-    live.current = { onPoses, onStatus, running, mode };
-  }, [onPoses, onStatus, running, mode]);
+    live.current = {
+      onPoses,
+      onStatus,
+      running,
+      mode,
+      exercise,
+      demoMotion,
+      demoPlaying,
+      ghost,
+      ghostRef,
+      overlay,
+    };
+  }, [
+    onPoses,
+    onStatus,
+    running,
+    mode,
+    exercise,
+    demoMotion,
+    demoPlaying,
+    ghost,
+    ghostRef,
+    overlay,
+  ]);
 
   useEffect(() => {
     let disposed = false;
@@ -145,6 +185,8 @@ export default function VisionStage({
     let lastStatus = "";
     let demoStart = performance.now();
     let wasRunning = false;
+    let coachElapsed = 0;
+    let coachStamp = performance.now();
     const overlayTracker = new PlayerTracker(players);
     const report = (message: string, ready: boolean) => {
       if (!disposed && message !== lastStatus) {
@@ -161,36 +203,69 @@ export default function VisionStage({
       return;
     }
 
+    const court = document.createElement("canvas");
+    const openPoses = [0.5, 0.29, 0.71].map((center) => syntheticPose(true, center));
+    const closedPoses = [0.5, 0.29, 0.71].map((center) => syntheticPose(false, center));
     const loop = (time: number) => {
       if (disposed) return;
       raf = requestAnimationFrame(loop);
-      if (time - lastFrame < 50) return;
+      const budget = demo ? 33 : 80;
+      if (time - lastFrame < budget) return;
       lastFrame = time;
       if (demo) {
+        if (canvas.width !== 960) {
+          canvas.width = 960;
+          canvas.height = 540;
+          court.width = 960;
+          court.height = 540;
+          const courtCtx = court.getContext("2d");
+          if (courtCtx) drawCourt(courtCtx);
+        }
         if (live.current.running && !wasRunning) demoStart = time;
         wasRunning = live.current.running;
-        const poses = Array.from({ length: players }, (_, i) => {
-          const phase =
-            ((time - demoStart) % (i === 0 ? 2000 : 2700)) /
-            (i === 0 ? 2000 : 2700);
-          const center = players === 1 ? 0.5 : 0.29 + i * 0.42;
-          const pose = syntheticPose(
-            live.current.running && phase > 0.28 && phase < 0.68,
-            center,
-          );
-          if (live.current.mode === "arm-raises") {
-            const closed = syntheticPose(false, center);
-            for (let joint = 23; joint < pose.length; joint++)
-              pose[joint] = closed[joint];
-          }
-          return pose;
-        });
-        canvas.width = 1280;
-        canvas.height = 720;
-        drawCourt(ctx);
-        poses.forEach((pose, i) => drawPose(ctx, pose, COLORS[i], true));
+        const coach = live.current.demoMotion === "coach";
+        if (coach && live.current.demoPlaying) coachElapsed += time - coachStamp;
+        coachStamp = time;
+        const exerciseId =
+          live.current.exercise === "squats" ? "squats" : "arm-raises";
+        const poses = coach
+          ? Array.from(
+              { length: players },
+              (_, i) => demoFrame(exerciseId, coachElapsed, i).pose,
+            )
+          : Array.from({ length: players }, (_, i) => {
+              const period = i === 0 ? 2000 : 2700;
+              const phase = ((time - demoStart) % period) / period;
+              const slot = players === 1 ? 0 : i + 1;
+              const moving =
+                live.current.running && phase > 0.28 && phase < 0.68;
+              const pose = (moving ? openPoses : closedPoses)[slot];
+              if (live.current.mode !== "arm-raises") return pose;
+              const closed = closedPoses[slot];
+              const mixed = pose.slice();
+              for (let joint = 23; joint < mixed.length; joint++)
+                mixed[joint] = closed[joint];
+              return mixed;
+            });
+        ctx.drawImage(court, 0, 0);
         live.current.onPoses(poses, time);
-        report("Synthetic poses ready · no webcam in use", true);
+        const painted = live.current.overlay?.() ?? poses;
+        painted.forEach((pose, i) => {
+          if (pose) drawPose(ctx, pose, COLORS[i] || COLORS[0], true);
+        });
+        const ghostPose = live.current.ghostRef?.current ?? live.current.ghost;
+        if (ghostPose) {
+          ctx.save();
+          ctx.globalAlpha = 0.4;
+          drawPose(ctx, ghostPose, "#ddfa51", false);
+          ctx.restore();
+        }
+        report(
+          coach
+            ? "Synthetic coaching athletes · controlled and rushed examples"
+            : "Synthetic poses ready · no webcam in use",
+          true,
+        );
         return;
       }
       if (!model || video.readyState < 2 || video.currentTime === lastVideoTime)
@@ -211,20 +286,26 @@ export default function VisionStage({
         const poses = sorted.map((pose) =>
           pose.map((point) => ({ ...point, x: 1 - point.x })),
         );
-        overlayTracker.update(poses, time).forEach((pose, i) => {
-          if (pose)
-            drawPose(
-              ctx,
-              pose.map((point) => ({ ...point, x: 1 - point.x })),
-              COLORS[i],
-              false,
-            );
-        });
         live.current.onPoses(poses, time);
+        const painted =
+          live.current.overlay?.() ?? overlayTracker.update(poses, time);
+        painted.forEach((pose, i) => {
+          if (pose) drawPose(ctx, pose, COLORS[i] || COLORS[0], false, true);
+        });
+        const ghostPose = live.current.ghostRef?.current ?? live.current.ghost;
+        if (ghostPose) {
+          ctx.save();
+          ctx.globalAlpha = 0.4;
+          drawPose(ctx, ghostPose, "#ddfa51", false, true);
+          ctx.restore();
+        }
         const required =
-          live.current.mode === "arm-raises"
-            ? [11, 12, 15, 16]
-            : [11, 12, 15, 16, 23, 24, 27, 28];
+          live.current.exercise === "squats"
+            ? [23, 24, 25, 26, 27, 28]
+            : live.current.mode === "arm-raises" ||
+                live.current.exercise === "arm-raises"
+              ? [11, 12, 15, 16]
+              : [11, 12, 15, 16, 23, 24, 27, 28];
         const valid = poses.filter((pose) =>
           required.every((i) => (pose[i]?.visibility ?? 0) >= 0.55),
         ).length;
@@ -233,9 +314,12 @@ export default function VisionStage({
             ? `${valid} player${valid === 1 ? "" : "s"} tracked · ready`
             : valid > 0
               ? `${valid}/${players} players ready. Separate into left and right lanes, or switch to practice.`
-              : live.current.mode === "arm-raises"
-                ? "Show both shoulders and hands to the camera."
-                : "Step back until shoulders, hands, hips and feet are visible.",
+              : live.current.exercise === "squats"
+                ? "Step back until hips, knees, and feet are visible."
+                : live.current.mode === "arm-raises" ||
+                    live.current.exercise === "arm-raises"
+                  ? "Show both shoulders and hands to the camera."
+                  : "Step back until shoulders, hands, hips and feet are visible.",
           valid >= players,
         );
       } catch {
@@ -263,9 +347,10 @@ export default function VisionStage({
         stream = await navigator.mediaDevices.getUserMedia({
           audio: false,
           video: {
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
+            width: { ideal: 640 },
+            height: { ideal: 480 },
             facingMode: "user",
+            frameRate: { ideal: 24, max: 30 },
           },
         });
         if (disposed) {
@@ -377,3 +462,5 @@ export default function VisionStage({
     </div>
   );
 }
+
+export default memo(VisionStage);

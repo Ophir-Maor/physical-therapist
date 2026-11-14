@@ -2,27 +2,61 @@
 
 ## Runtime and data flow
 
-The Next.js App Router application is local-first. `src/app/page.tsx` owns presentation phases (`landing`, `setup`, `calibration`, `countdown`, `active`, `complete`) and browser settings. The separate `GameEngine` owns deterministic match states (`idle`, `active`, `complete`). Calibration and the three-second countdown occur before `GameEngine.start()`.
+The Next.js App Router application is local-first and has two experiences on one vision and voice stack.
+
+- Arcade (`src/app/page.tsx`): phases `landing`, `setup`, `calibration`, `countdown`, `active`, `complete`. `GameEngine` still owns `idle`, `active`, and `complete`. A rep is one counted cycle.
+- Guided coach (`src/components/coach-flow.tsx`): setup, demonstration, registration or calibration, countdown, active set, results, progress. `FormEvaluator` owns movement phase and quality. A scored rep is a complete cycle whose landmarks were clear enough to measure.
 
 ```text
-Webcam → MediaPipe VIDEO inference ─┐
-                                  ├→ screen-space poses → PlayerTracker
-Synthetic demo fixture ────────────┘                       ↓
-                                               per-player ActivityDetector
-                                                          ↓
-                                                  GameEngine.rep/tick
-                                                          ↓
-                                      scores + typed events + results
-                                                          ↓
-                             commentary templates → priority queue
-                                                          ↓
-                                     POST /api/tts → ElevenLabs MP3
-                                                          ↓
-                                     browser playback + caption
-                                      (explicit fallback on failure)
+Webcam or synthetic landmarks
+        → screen-space poses
+        → PlayerTracker (demo and solo arcade)
+          or IdentityRegistrar (live two-player, and live coach)
+        → ActivityDetector (arcade) or FormEvaluator (coach)
+        → scores or quality events
+        → commentary templates → priority queue
+        → POST /api/tts → ElevenLabs MP3
+        → playback + captions
+Optional: POST /api/leaderboard with nickname and score only
 ```
 
-Camera data never enters the server route. The optional LLM design from the original brief is not implemented: all commentary prose uses templates selected by actual game events and announcer personality.
+Camera frames never enter a server route. Commentary is template text from structured events. There is no LLM. Coach copy is selected from the measured feedback string and the chosen personality.
+
+## Form scoring
+
+`FormEvaluator` samples shoulder-to-wrist elevation for arm raises and image-plane knee flexion for squats. Signals are lightly smoothed. Speed samples ignore gaps longer than 450 ms so a pause or a dropped frame is not treated as a jerk.
+
+A repetition is the held return to the start after a real rise. Prototype weights are control 40%, selected-target range 30%, observable alignment 20%, and consistency 10%. Reaching the selected target scores 100 on range. Exceeding it does not score higher. If either arm or either leg is not confident, alignment is null instead of invented. If required landmarks disappear for more than 500 ms mid-rep, the attempt is aborted with a reason and `quality: null`.
+
+Squat confidence is capped and every scored squat carries a note that depth is approximate. These thresholds are not clinical.
+
+`RangeCalibrator` stores practice peaks and lets the UI choose 60–100% of the observed peak. Fallback targets are 65° (arms) and 30° (squat flexion), labeled as fallbacks.
+
+`pickWinner("form")` compares average quality and can prefer fewer smooth reps over more rushed ones. `pickWinner("consistency")` compares how tightly scored peaks cluster around that player’s own target. Unscored reps are excluded. Scores within one point are a tie.
+
+## Identity
+
+`IdentityRegistrar` enrolls one confident torso, then a second torso at least 0.18 screen-widths away, then keeps those anchors. Assignment does not trust MediaPipe’s pose order. If the two people are closer than 0.14, or the two possible assignments are nearly equal, scoring is suspended. Anchors survive a short absence (about two seconds). This is not biometric identity. `PlayerTracker` remains the demo and solo arcade assigner.
+
+## Persistence and the optional board
+
+`el-settings` and `el-history` are unchanged in shape. `el-sessions` stores the richer coach and arcade records, capped at 30, with malformed rows dropped. Personal bests require the same exercise, challenge, demo flag, and a target within 10%.
+
+`/api/leaderboard` uses `@neondatabase/serverless` only when `DATABASE_URL` is set. It creates this table if needed:
+
+```sql
+CREATE TABLE IF NOT EXISTS leaderboard (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  nickname text NOT NULL,
+  exercise text NOT NULL,
+  challenge text NOT NULL,
+  average integer NOT NULL,
+  reps integer NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+```
+
+The handler validates a strict object, refuses `demo: true`, and allows 8 posts per minute per process. That is a local demo guard, not authentication or cheat prevention.
 
 ## Vision
 

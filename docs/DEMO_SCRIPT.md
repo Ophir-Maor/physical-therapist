@@ -2,40 +2,34 @@
 
 ## Before presenting
 
-Start `npm run dev` and open localhost in desktop Chrome. Use headphones or room audio at a tested volume. If available, set the ElevenLabs key in `.env.local`, restart, and confirm real voice before presenting; otherwise explain the labeled browser-speech/caption fallback. Do not describe fallback as live ElevenLabs output.
+Start `npm run dev` and open localhost in desktop Chrome. Use headphones or room audio at a tested volume. If available, set the ElevenLabs key in `.env.local`, restart, and confirm real voice before presenting. Otherwise explain the labeled browser-speech and caption fallback. Do not describe that fallback as live ElevenLabs output.
 
-Keep the local model assets intact. Confirm the camera is free, the room is lit, and both players can keep their feet and hands in frame. Complete a physical rehearsal before relying on live scoring. Keep Demo Mode ready as the deterministic fallback. No publication or Git operations are needed.
+Keep Demo Mode ready. Say out loud that movement scores are experimental and are not a medical grade. No publication or Git operations are needed.
 
-## 0:00–0:30 — The premise
+## 0:00–0:25 — Two modes
 
-Open the landing page: “We give ordinary movements the broadcast treatment they absolutely do not deserve.” Point out that the camera feed stays on the device. Click **Start Broadcasting**.
+Open the landing page. Point at **Start Broadcasting** for the timed championship, then click **Guided Coach**. The camera stays on the device.
 
-Choose a 30-second jumping-jack championship, two player names, and **The Hype Machine**. Explain that arm raises offer a smaller-space alternative.
+## 0:25–1:10 — Guided demo, no camera
 
-## 0:30–1:20 — Live match, if rehearsed
+Choose controlled arm raises, Supportive Coach or Hype Commentator, and **4 quality reps**. Continue to the generated skeleton. That figure is drawn in the app. Enter **coach demo**.
 
-Select **Live webcam**, then **Enable Camera**. Explicitly allow the browser permission request. Player 1 stands on the left of the mirrored preview; player 2 on the right. Keep lanes separated. Start with arms down and feet together. Wait for both players to be ready, then click **Start match**.
+Wait until a practice range appears, accept that target, and let the synthetic athlete finish. Point at the phase rail and the quality number. An unclear frame stays unscored. On the results screen, a rushed repetition is worth less than a controlled one. With two demo athletes, the left script is smoother and should lead on average even if the right one finishes more reps.
 
-During the match, point out skeletal overlays, independent scores, event-driven commentary, and the elapsed-time clock. Explain that a rep needs a complete closed–open–closed cycle. Use a few deliberate movements, rather than racing before detector behavior is established.
+## 1:10–2:10 — Live coach, if rehearsed
 
-If only one player is detected, use **Switch to one-player setup**. If camera/model readiness fails, return to setup and enter **Demo Mode** rather than repeatedly troubleshooting on stage.
+Go back, choose **Live webcam**, and enable the camera. For two people, register player 1 alone on the left, then player 2. Do one slow comfortable arm raise, lower the target if you want, and start. Stop is always available. Do not tell anyone to continue through pain.
 
-## 1:20–2:00 — Results and replay
+If the camera fails, return to Demo Mode. Do not present synthetic skeletons as webcam output.
 
-Show the final score, winner/draw, humorous recap, and transcript. Explain that only commentary text goes to the server for ElevenLabs speech. The voice status distinguishes live synthesis from fallback.
+## 2:10–2:40 — Arcade, still here
 
-Select **Change the lineup**, choose Demo Mode and a 15-second match, and enter the arena. Say explicitly: “These are synthetic athletes, running through the real detector and scoring pipeline.”
-
-## 2:00–2:40 — Reliability and engineering
-
-Start the synthetic match and open **Show tracking diagnostics**. Highlight detector phases, tracking confidence, and event logs. Demonstrate that the two athletes have independent rhythms and scores. Explain brief missing-landmark handling, spatial player association, and the bounded commentary queue that avoids overlapping voices.
-
-Do not claim synthetic confidence proves real-world accuracy. Mention that crossings remain ambiguous and competitors stay in their lanes.
+From the landing page, choose **Start Broadcasting**, a 15-second jumping-jack demo, and **Enter Demo Arena**. The original rep counter, clock, and announcer are unchanged. For a live two-player arcade match, register one person at a time and stay in lanes.
 
 ## 2:40–3:00 — Close
 
-Show the synthetic results and recent local history. “No stadium, no account, no video uploads—just your living room and championship-level commitment.” Describe real-world tuning and hardware rehearsal as the next validation step.
+Open **Progress**. History is on this device. A shared Neon board appears only when `DATABASE_URL` is set, and it stores a nickname and score, not video.
 
 ## Fast fallback
 
-If audio is blocked or the API fails, use visible captions and the labeled demo voice. If two-person tracking fails, switch to solo arm raises. If camera setup fails, use Demo Mode; never present synthetic poses as webcam output.
+If audio fails, use captions. If two-person tracking fails, switch to solo arm raises. If the camera fails, use Demo Mode.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CommentaryQueue, commentaryFor } from "./commentary";
+import { CommentaryQueue, coachCommentary, commentaryFor } from "./commentary";
 import type { GameEvent } from "./engine";
 const event = (type: string, scores = [5, 4]): GameEvent => ({
   id: "1",
@@ -53,6 +53,39 @@ describe("event commentary", () => {
 });
 
 // Use mocked browser primitives to verify serialization and cancellation, not provider audio quality.
+describe("coach personalities", () => {
+  it("uses the measured cue and never tells someone to ignore pain", () => {
+    for (const personality of ["supportive", "drill", "hype", "calm"] as const) {
+      const intro = coachCommentary({
+        type: "intro",
+        personality,
+        name: "Alex",
+      });
+      const rep = coachCommentary({
+        type: "rep",
+        personality,
+        name: "Alex",
+        quality: 92,
+        feedback: "Try lowering a little more slowly.",
+      });
+      expect(intro.toLowerCase()).toMatch(/stop|pain/);
+      expect(`${intro} ${rep}`.toLowerCase()).not.toMatch(
+        /ignore pain|push through|no pain no gain/,
+      );
+      expect(rep).toContain("92");
+      expect(rep.toLowerCase()).toContain("slowly");
+    }
+    expect(
+      coachCommentary({
+        type: "rep",
+        personality: "calm",
+        name: "Alex",
+        quality: null,
+        feedback: "I couldn't clearly see the required landmarks.",
+      }),
+    ).toMatch(/Not scored/);
+  });
+});
 describe("voice playback lifecycle", () => {
   it("does not overlap clips and interrupts stale speech for the result", async () => {
     const { vi } = await import("vitest");

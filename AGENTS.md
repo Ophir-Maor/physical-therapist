@@ -4,19 +4,19 @@ Read `docs/STATUS.md` first, then `docs/ARCHITECTURE.md`. The project is a local
 
 ## Authorization constraints
 
-- Do not initialize Git until the user explicitly authorizes it. Any future Next.js scaffolding must use `--disable-git`.
-- Do not stage, commit, push, create repositories or PRs, publish, or deploy until separately authorized by the user. Do not use helpers that implicitly perform those operations.
+- Git is already initialized. Stay on `feature/gamified-coaching` for this work. Do not stage, commit, push, open PRs, publish, or deploy until the user explicitly asks. Do not re-initialize the repository.
 - Local file changes, dependency installation, servers, and testing are authorized. Continue autonomously with routine implementation choices.
 - Never expose keys or write secrets to public files. Keep `.env.local`, generated outputs, credentials, and test artifacts ignored.
 
 ## Engineering constraints
 
-- Keep webcam frames entirely browser-local. Only commentary text may reach ElevenLabs.
-- Label synthetic poses and fallback voices honestly. Do not claim real camera or paid API verification from mock/demo tests.
-- Keep scoring/detectors independent of React and speech playback; preserve monotonic millisecond timestamps and duration seconds.
-- Full cycles only. Maintain confidence thresholds, smoothing, held transitions, missing-landmark handling, and per-player state.
-- Player assignment is based on screen-space position. Document crossing/occlusion limits rather than claiming robust biometric identity.
-- Preserve server-side Zod validation, bounded text, timeouts, and explicit API failure fallback.
+- Keep webcam frames entirely browser-local. Only commentary text may reach ElevenLabs. Leaderboard posts, if enabled, contain a nickname and score metadata only.
+- This is a movement-coaching prototype, not a medical device. Do not claim diagnosis, prescribed rehab, or clinical recovery. Say when a metric was not visible enough to score.
+- Label synthetic poses and fallback voices honestly. Do not claim real camera, paid API, or database verification from mock or demo tests.
+- Keep scoring, form evaluation, and detectors independent of React and speech playback. Preserve monotonic millisecond timestamps.
+- Full cycles only. Maintain confidence thresholds, smoothing, held transitions, missing-landmark handling, and per-player state. Do not reward moving past a selected target.
+- Live two-player assignment is sequential and then spatial. Document crossing and occlusion limits. Do not use face recognition.
+- Preserve server-side Zod validation, bounded text, timeouts, and explicit API failure fallback on both speech and the optional leaderboard.
 - No database, authentication infrastructure, Python backend, or optional LLM integration is needed for the core demo.
 - Consult official documentation and actual installed signatures before changing MediaPipe or ElevenLabs APIs.
 - Prefer task-focused tests over implementation-mirroring tests. Run type checking, linting, meaningful unit/browser tests, and production build after substantial changes.

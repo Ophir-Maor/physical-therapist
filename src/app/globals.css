@@ -1156,6 +1156,216 @@ select {
     font-size: 9px;
   }
 }
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+.disclaimer,
+.coach-cue {
+  color: #c5cdc4;
+  line-height: 1.6;
+}
+.disclaimer {
+  max-width: 760px;
+  font-size: 14px;
+}
+.coach-wrap,
+.coach-progress {
+  padding: 28px 5% 64px;
+}
+.coach-guide,
+.coach-session {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 28px;
+  align-items: start;
+}
+.coach-session {
+  grid-template-columns: 1fr;
+}
+.demo-skeleton {
+  width: min(100%, 420px);
+  height: auto;
+  border: 1px solid var(--line);
+  background: #101816;
+}
+.quality-hero {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin: 18px 0;
+}
+.quality-hero div,
+.metric-list div {
+  background: #141816;
+  border: 1px solid var(--line);
+  padding: 14px;
+}
+.quality-hero span,
+.phase-rail span,
+.metric-list span {
+  display: block;
+  color: var(--muted);
+  font: 11px monospace;
+  letter-spacing: 1px;
+}
+.quality-hero b {
+  font-size: clamp(42px, 6vw, 72px);
+  line-height: 0.95;
+}
+.phase-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.phase-rail span {
+  border: 1px solid var(--line);
+  padding: 8px 10px;
+}
+.phase-rail .on {
+  color: #172000;
+  background: var(--lime);
+}
+.coach-cue {
+  font-size: 22px;
+  color: white;
+}
+.metric-list {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0;
+}
+.results-metrics i {
+  display: block;
+  height: 8px;
+  margin-top: 8px;
+  background: var(--lime);
+}
+.stop-row,
+.session-top,
+.share-box {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+.share-box,
+.history-list {
+  display: grid;
+  gap: 12px;
+}
+.trend {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+  min-height: 140px;
+  margin: 20px 0;
+}
+.trend div {
+  display: flex;
+  flex-direction: column;
+  justify-content: end;
+  align-items: center;
+  min-width: 64px;
+  height: 140px;
+}
+.trend i {
+  display: block;
+  width: 28px;
+  background: var(--lime);
+}
+.trend span,
+.history-list span {
+  color: var(--muted);
+  font-size: 11px;
+}
+.coach-guide ol,
+.coach-guide ul,
+.recap ul {
+  color: #c5cdc4;
+  line-height: 1.6;
+}
+@media (max-width: 900px) {
+  .coach-guide,
+  .quality-hero,
+  .session-top,
+  .stop-row {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+  .quality-hero b {
+    font-size: 48px;
+  }
+}
+.split-demo {
+  display: grid;
+  grid-template-columns: minmax(220px, 420px) minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+.coach-broadcast {
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 420px);
+}
+.coach-broadcast .commentary {
+  max-height: none;
+  overflow: auto;
+}
+.exercise-demo {
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+  background: #101816;
+}
+.coach-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+.camera-shell .phase-rail {
+  position: absolute;
+  z-index: 2;
+  top: 54px;
+  left: 12px;
+  right: 12px;
+  pointer-events: none;
+}
+.metric-row i {
+  display: block;
+  height: 8px;
+  margin-top: 8px;
+  background: var(--lime);
+  max-width: 100%;
+}
+.badge-row {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+.badge-row span,
+.history-card {
+  display: block;
+  border: 1px solid var(--line);
+  padding: 12px;
+}
+.history-card strong,
+.badge-row b {
+  display: block;
+  font-size: 28px;
+}
+.commentary .primary,
+.commentary .secondary {
+  margin-top: 8px;
+}
+@media (max-width: 900px) {
+  .split-demo,
+  .coach-broadcast {
+    grid-template-columns: 1fr;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   *,
   *:before,
