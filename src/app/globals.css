@@ -86,17 +86,6 @@ button:active:not(:disabled) {
 .brand-light {
   font-weight: 400;
 }
-.brand-dot {
-  font-size: 10px;
-  align-self: flex-start;
-  margin-top: 5px;
-}
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 32px;
-}
-.edition,
 .eyebrow,
 .live-pill,
 .field-label {
@@ -104,9 +93,6 @@ button:active:not(:disabled) {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 1.4px;
-}
-.edition {
-  color: var(--muted);
 }
 .live-pill {
   display: inline-flex;
@@ -169,6 +155,20 @@ em {
   color: #14170b;
   font-size: 14px;
   font-weight: 800;
+}
+.home-progress {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #111516;
+  color: #eceee7;
+  border: 1px solid #363c3d;
+  padding: 18px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.home-progress:hover {
+  color: var(--lime);
 }
 .hero-meta {
   display: flex;
@@ -308,12 +308,6 @@ h2 {
   margin-bottom: 16px;
   font-size: 10px;
 }
-.age-field {
-  max-width: 140px;
-}
-.age-field input::placeholder {
-  color: #6d7474;
-}
 .coach-preview {
   margin-bottom: 28px;
 }
@@ -322,6 +316,9 @@ h2 {
   grid-template-columns: 1fr 1fr;
   gap: 12px;
   margin-bottom: 30px;
+}
+.next-workouts {
+  grid-template-columns: 1fr;
 }
 .choice {
   background: #111516;
@@ -1132,9 +1129,6 @@ a.secondary:focus-visible {
   .hero h1 {
     font-size: 65px;
   }
-  .edition {
-    display: none;
-  }
   .broadcast-grid {
     grid-template-columns: 1fr;
   }
@@ -1295,6 +1289,9 @@ a.secondary:focus-visible {
   gap: 12px;
   align-items: center;
 }
+.hero-coaches {
+  margin-top: 28px;
+}
 .disclaimer,
 .coach-cue {
   color: #c5cdc4;
@@ -1438,6 +1435,26 @@ a.secondary:focus-visible {
   grid-template-columns: minmax(220px, 420px) minmax(0, 1fr);
   gap: 28px;
   align-items: start;
+}
+.pattern-notes {
+  display: grid;
+  gap: 22px;
+  margin-bottom: 28px;
+}
+.pattern-notes p,
+.pattern-notes ul {
+  margin: 0;
+}
+.pattern-notes li + li {
+  margin-top: 10px;
+}
+.pattern-misses {
+  display: grid;
+  gap: 10px;
+}
+.pattern-misses ul {
+  padding-left: 18px;
+  list-style: disc;
 }
 .coach-broadcast {
   grid-template-columns: minmax(0, 1fr) minmax(300px, 420px);
@@ -1632,6 +1649,9 @@ a.secondary:focus-visible {
   display: block;
   border: 1px solid var(--line);
   padding: 12px;
+}
+.progress-start {
+  margin-top: 28px;
 }
 .history-card strong,
 .badge-row b {

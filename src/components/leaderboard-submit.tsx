@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 type Props = {
   demo: boolean;
@@ -16,6 +16,7 @@ type Props = {
   goalReps?: number | null;
   consistency?: number | null;
   suggestedName: string;
+  companion?: ReactNode;
 };
 
 export default function LeaderboardSubmit(props: Props) {
@@ -83,26 +84,28 @@ export default function LeaderboardSubmit(props: Props) {
   }
 
   if (props.demo) {
-    return (
-      <p className="disclaimer" role="status">
-        Demo Mode stays on this device. Synthetic results are not accepted on
-        the public leaderboard.
-      </p>
-    );
+    return props.companion ? (
+      <div className="board-panel">
+        <div className="result-actions">{props.companion}</div>
+      </div>
+    ) : null;
   }
 
   return (
     <div className="board-panel">
-      {!submitted && (
-        <button
-          className="primary"
-          type="button"
-          disabled={!canSubmit}
-          onClick={() => setOpen(true)}
-        >
-          Submit to Leaderboard
-        </button>
-      )}
+      <div className="result-actions">
+        {!submitted && (
+          <button
+            className="primary"
+            type="button"
+            disabled={!canSubmit}
+            onClick={() => setOpen(true)}
+          >
+            Submit to Leaderboard
+          </button>
+        )}
+        {props.companion}
+      </div>
       {!canSubmit && !submitted && (
         <p className="disclaimer">
           This session has no public score yet. Finish at least one counted

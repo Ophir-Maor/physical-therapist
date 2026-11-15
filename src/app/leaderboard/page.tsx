@@ -25,7 +25,6 @@ type Payload = {
   entries?: Entry[];
   unit?: string;
   message?: string;
-  notice?: string;
   tieBreak?: string;
   place?: { rank: number | null; inTop10: boolean } | null;
 };
@@ -226,7 +225,6 @@ export default function ChampionshipBoard() {
             ))}
           </ol>
         )}
-        <p className="disclaimer">{data?.notice}</p>
       </section>
     </main>
   );

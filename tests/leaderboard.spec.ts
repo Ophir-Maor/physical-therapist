@@ -24,7 +24,7 @@ test("championship board filters and empty or loaded state", async ({ page }) =>
 test("championship board stays readable on a phone", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await page.getByRole("link", { name: "Quality board" }).click();
+  await page.getByRole("link", { name: "Open full board" }).click();
   await expect(page).toHaveURL(/\/leaderboard/);
   await expect(page.getByLabel("Exercise")).toBeVisible();
   const box = await page.getByLabel("Exercise").boundingBox();
