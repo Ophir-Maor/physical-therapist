@@ -227,7 +227,9 @@ export class GameEngine {
   private halfway = new Set<number>();
   readonly goal: number;
   readonly players: string[];
-  constructor(options: { goal: number; players: string[] }) {
+  /** When set, each athlete finishes alone. The match ends after the last one reaches the goal. */
+  readonly sequential: boolean;
+  constructor(options: { goal: number; players: string[]; sequential?: boolean }) {
     this.goal = Math.max(
       1,
       Math.round(Number.isFinite(options.goal) ? options.goal : 10),
@@ -235,6 +237,7 @@ export class GameEngine {
     this.players = options.players.slice(0, 2);
     if (!this.players.length) this.players = ["Player 1"];
     this.scores = this.players.map(() => 0);
+    this.sequential = options.sequential ?? false;
   }
   private emit(type: GameEventType, timestamp: number, player?: number) {
     this.events.push({
@@ -260,6 +263,7 @@ export class GameEngine {
       player >= this.scores.length
     )
       return;
+    if (this.sequential && this.scores[player] >= this.goal) return;
     this.lastTime = timestamp;
     const previous =
       this.scores.length === 2 ? Math.sign(this.scores[0] - this.scores[1]) : 0;
@@ -280,10 +284,21 @@ export class GameEngine {
       else if (next !== previous)
         this.emit("PLAYER_TAKES_LEAD", timestamp, next > 0 ? 0 : 1);
     }
-    if (this.scores[player] >= this.goal) {
+    const finished = this.sequential
+      ? this.scores.every((score) => score >= this.goal)
+      : this.scores[player] >= this.goal;
+    if (finished) {
       this.state = "complete";
-      this.winner = player;
-      this.emit("MATCH_FINISHED", timestamp, player);
+      if (this.sequential) {
+        const best = Math.max(...this.scores);
+        const leaders = this.scores.flatMap((score, index) =>
+          score === best ? [index] : [],
+        );
+        this.winner = leaders.length === 1 ? leaders[0] : null;
+      } else {
+        this.winner = player;
+      }
+      this.emit("MATCH_FINISHED", timestamp, this.winner ?? player);
     }
   }
   reset() {

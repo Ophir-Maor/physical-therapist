@@ -122,6 +122,20 @@ describe("rep-goal game scoring", () => {
     solo.rep(0, 1000);
     expect(solo.winner).toBe(0);
   });
+  it("lets two players finish one at a time and ties equal goals", () => {
+    const g = new GameEngine({ goal: 2, players: ["A", "B"], sequential: true });
+    g.start(1000);
+    g.rep(0, 1100);
+    g.rep(0, 1200);
+    g.rep(0, 1300);
+    expect(g.state).toBe("active");
+    expect(g.scores).toEqual([2, 0]);
+    g.rep(1, 1400);
+    g.rep(1, 1500);
+    expect(g.state).toBe("complete");
+    expect(g.scores).toEqual([2, 2]);
+    expect(g.winner).toBeNull();
+  });
   it("snapshots event scores without subsequent mutation", () => {
     const g = new GameEngine({ goal: 5, players: ["A"] });
     g.start(0);

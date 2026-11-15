@@ -337,15 +337,14 @@ function clean(line: string) {
 
 export function renderLine(context: SessionContext, decision: CoachDecision): string {
   if (!decision.speak) return "";
-  const name = context.name;
   const fact = decision.fact;
   if (decision.focus === "tracking") {
     return clean(
       context.personality === "drill"
-        ? `${name}, hold up. ${fact}`
+        ? `Hold up. ${fact}`
         : context.personality === "hype"
-          ? `${name}, the camera lost you. ${fact}`
-          : `${name}, ${fact}`,
+          ? `The camera lost you. ${fact}`
+          : fact,
     );
   }
   if (decision.focus === "recap") return renderRecap(context);
@@ -354,8 +353,8 @@ export function renderLine(context: SessionContext, decision: CoachDecision): st
       context.personality === "calm"
         ? `Not scored. ${fact}`
         : context.personality === "drill"
-          ? `${name}, I can't score that one. ${fact}`
-          : `${name}, I'll leave that one unscored. ${fact}`,
+          ? `I can't score that one. ${fact}`
+          : `I'll leave that one unscored. ${fact}`,
     );
   }
   if (decision.focus === "first") {
@@ -363,30 +362,30 @@ export function renderLine(context: SessionContext, decision: CoachDecision): st
       context.personality === "calm"
         ? `First scored rep, ${fact}`
         : context.personality === "drill"
-          ? `${name}, first one is in. ${fact}`
+          ? `First one is in. ${fact}`
           : context.personality === "hype"
-            ? `${name} opens with ${fact}`
-            : `${name}, that's a start. ${fact}`,
+            ? `Opening rep is in. ${fact}`
+            : `That's a start. ${fact}`,
     );
   }
   if (decision.focus === "control" && decision.tone === "humorous") {
     return clean(
       context.personality === "drill"
-        ? `${name}, that one sprinted off without you. ${fact}`
+        ? `That one sprinted off without you. ${fact}`
         : context.personality === "hype"
-          ? `${name}, that rep tried to set a speed record. ${fact}`
-          : `${name}, that one got quick. ${fact}`,
+          ? `That rep tried to set a speed record. ${fact}`
+          : `That one got quick. ${fact}`,
     );
   }
   if (decision.focus === "improvement") {
     return clean(
       context.personality === "hype"
-        ? `${name}, that jumped, ${fact}`
-        : context.personality === "drill"
-          ? `Better, ${name}. ${fact}`
-          : context.personality === "calm"
+        ? `That jumped. ${fact}`
+        : context.personality === "calm"
+          ? `Better. ${fact}`
+          : context.personality === "drill"
             ? `Better. ${fact}`
-            : `That's smoother, ${name}. ${fact}`,
+            : `That's smoother. ${fact}`,
     );
   }
   if (decision.focus === "streak") {
@@ -394,16 +393,14 @@ export function renderLine(context: SessionContext, decision: CoachDecision): st
       context.personality === "hype"
         ? `Three strong reps, and that one was ${fact}.`
         : context.personality === "drill"
-          ? `${name}, three controlled reps. Keep that, not the rush.`
+          ? `Three controlled reps. Keep that, not the rush.`
           : context.personality === "calm"
             ? `Three steady reps. Last one was ${fact}.`
-            : `${name}, three solid reps in a row. Last one was ${fact}.`,
+            : `Three solid reps in a row. Last one was ${fact}.`,
     );
   }
   if (decision.focus === "decline" || decision.focus === "range" || decision.focus === "alignment" || decision.focus === "control") {
-    return clean(
-      context.personality === "calm" ? fact : `${name}, ${fact.charAt(0).toLowerCase()}${fact.slice(1)}`,
-    );
+    return clean(fact);
   }
   return clean(fact);
 }
@@ -421,7 +418,7 @@ export function renderRecap(context: SessionContext) {
   const next = context.suggestion ? ` Next time, ${context.suggestion.charAt(0).toLowerCase()}${context.suggestion.slice(1)}` : "";
   const strongest = context.strongestLabel ? ` Strongest measure was ${context.strongestLabel.toLowerCase()}.` : "";
   return clean(
-    `${context.name}, ${context.repNumber} scored reps, average ${average}.${change}${strongest}${next}`,
+    `${context.repNumber} scored reps, average ${average}.${change}${strongest}${next}`,
   );
 }
 
@@ -435,24 +432,24 @@ export function renderFixed(
       intro: `${name}, we'll work on control and your selected target. Stop if anything feels painful.`,
       preview:
         "Hi, I'm Sarah, your supportive coach. We'll build smooth, controlled reps together. Let's get ready to work, and stop if anything hurts.",
-      stop: `${name}, we stopped. That's the right call if something hurts or you're done.`,
+      stop: "We stopped. That's the right call if something hurts or you're done.",
     },
     drill: {
       intro: `${name}, controlled reps. Stop immediately if you feel pain.`,
       preview:
         "Callum here, your drill sergeant. Sharp control, no sloppy shortcuts. Let's get to work—and stop immediately if something hurts.",
-      stop: `${name}, session stopped. We don't train through pain.`,
+      stop: "Session stopped. We don't train through pain.",
     },
     hype: {
       intro: `${name}, we're scoring control, not speed. Stop if you feel pain.`,
       preview:
         "Charlie here, your hype commentator! Bring me one sharp rep at a time and I'll bring the energy. Let's get ready to work—and stop if you feel pain.",
-      stop: `${name}, you called it. Stopping when you need to is part of the set.`,
+      stop: "You called it. Stopping when you need to is part of the set.",
     },
     calm: {
       intro: `${name}, move to your target and come back slowly. Stop if you feel pain.`,
       preview: "Hi, I'm River, your calm instructor. We'll move slowly, breathe, and keep each cue clear. Let's begin, and stop if you feel pain.",
-      stop: `${name}, session stopped. End a set whenever you need to.`,
+      stop: "Session stopped. End a set whenever you need to.",
     },
   } as const;
   return lines[personality][type];

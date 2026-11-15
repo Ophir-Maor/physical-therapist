@@ -4,7 +4,7 @@ Read `docs/STATUS.md` first, then `docs/ARCHITECTURE.md`. The project is a local
 
 ## Authorization constraints
 
-- Git is already initialized. Stay on `feature/gamified-coaching` for this work. Do not stage, commit, push, open PRs, publish, or deploy until the user explicitly asks. Do not re-initialize the repository.
+- Git is already initialized. Stay on `ophir` for this work. It matches `origin/main` at `1a179cf` and is one merge commit ahead of `origin/ophir`. Do not stage, commit, push, open PRs, publish, or deploy until the user explicitly asks. Do not re-initialize the repository.
 - Local file changes, dependency installation, servers, and testing are authorized. Continue autonomously with routine implementation choices.
 - Never expose keys or write secrets to public files. Keep `.env.local`, generated outputs, credentials, and test artifacts ignored.
 
