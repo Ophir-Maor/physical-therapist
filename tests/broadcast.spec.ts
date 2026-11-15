@@ -6,10 +6,10 @@ test("demo uses detector pipeline through results and restart", async ({
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "BIG LEAGUE",
+    "TRAIN THE",
   );
   await page.screenshot({ path: "test-results/landing.png", fullPage: true });
-  await page.getByRole("button", { name: "Start Broadcasting" }).click();
+  await page.getByRole("button", { name: "Arcade Championship" }).click();
   await page.getByLabel("03 / MATCH LENGTH").selectOption("15");
   await page.getByRole("button", { name: "Enter Demo Arena" }).click();
   await expect(page.getByRole("button", { name: "Start match" })).toBeEnabled();
@@ -32,7 +32,7 @@ test("demo uses detector pipeline through results and restart", async ({
 test("solo arm raise setup and narrow layout", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await page.getByRole("button", { name: "Start Broadcasting" }).click();
+  await page.getByRole("button", { name: "Arcade Championship" }).click();
   await page.getByRole("button", { name: "Solo practice" }).click();
   await page.getByRole("button", { name: "Arm raises" }).click();
   await page.getByLabel("03 / MATCH LENGTH").selectOption("15");
@@ -63,7 +63,7 @@ test("camera denial is actionable and demo remains available", async ({
     });
   });
   await page.goto("/");
-  await page.getByRole("button", { name: "Start Broadcasting" }).click();
+  await page.getByRole("button", { name: "Arcade Championship" }).click();
   await page.getByLabel("Live webcam").check();
   await page.getByRole("button", { name: "Enable Camera" }).click();
   await expect(page.getByRole("status")).toContainText(

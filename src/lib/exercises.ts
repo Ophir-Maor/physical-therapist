@@ -60,22 +60,22 @@ export const COACHES = [
   {
     id: "supportive",
     name: "Supportive Coach",
-    detail: "Patient, specific, and encouraging.",
+    detail: "Warm and patient. Progress gets the praise.",
   },
   {
     id: "drill",
     name: "Drill Sergeant",
-    detail: "Loud and demanding. Never tells you to ignore pain.",
+    detail: "Gravelly, loud, and funny. Control over speed.",
   },
   {
     id: "hype",
     name: "Hype Commentator",
-    detail: "Championship calls for controlled reps.",
+    detail: "Sports announcer. Gets loud for a sharp rep.",
   },
   {
     id: "calm",
     name: "Calm Instructor",
-    detail: "Short cues and the score. Nothing extra.",
+    detail: "Slow, clear cues. No extra excitement.",
   },
 ] as const;
 

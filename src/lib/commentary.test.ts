@@ -74,7 +74,62 @@ describe("coach personalities", () => {
       );
       expect(rep).toContain("92");
       expect(rep.toLowerCase()).toContain("slowly");
+      expect(rep.length).toBeLessThan(240);
+      expect(`${intro} ${rep}`.toLowerCase()).not.toMatch(
+        /idiot|pathetic|weakling|useless|shut up/,
+      );
+      expect(
+        coachCommentary({
+          type: "preview",
+          personality,
+          name: "Alex",
+        }).toLowerCase(),
+      ).toMatch(/stop|pain/);
     }
+    const previews = (["supportive", "drill", "hype", "calm"] as const).map((personality) =>
+      coachCommentary({
+        type: "preview",
+        personality,
+        name: "Alex",
+      }),
+    );
+    expect(new Set(previews).size).toBe(4);
+    expect(previews[0]).toMatch(/supportive coach/i);
+    expect(previews[1]).toMatch(/Drill sergeant/i);
+    expect(previews[2]).toMatch(/Hype commentator/i);
+    expect(previews[3]).toMatch(/Calm instructor/);
+    expect(
+      coachCommentary({
+        type: "rep",
+        personality: "hype",
+        name: "Alex",
+        quality: 96,
+        feedback: "Keep the arms smooth.",
+      }),
+    ).toContain("96");
+    expect(
+      coachCommentary({
+        type: "rep",
+        personality: "supportive",
+        name: "Alex",
+        quality: 84,
+        feedback: "Keep the range comfortable.",
+        trend: "improved",
+      }),
+    ).toMatch(/smoother/i);
+    for (const line of previews) {
+      expect(line.toLowerCase()).not.toMatch(/living room|crowd goes wild|making history/);
+    }
+    expect(
+      coachCommentary({
+        type: "rep",
+        personality: "supportive",
+        name: "Alex",
+        quality: 84,
+        feedback: "Nice control.",
+        consistency: "steady",
+      }),
+    ).toContain("lining up");
     expect(
       coachCommentary({
         type: "rep",

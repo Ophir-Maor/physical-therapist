@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import VisionStage from "@/components/vision-stage";
 import CoachFlow from "@/components/coach-flow";
+import LeaderboardSubmit from "@/components/leaderboard-submit";
 import {
   ActivityDetector,
   GameEngine,
@@ -26,6 +27,7 @@ import {
   type Mode,
 } from "@/lib/engine";
 import { BroadcastVoice, commentaryFor } from "@/lib/commentary";
+import { COACHES, type CoachId } from "@/lib/exercises";
 import { IdentityRegistrar } from "@/lib/identity";
 import { saveSession } from "@/lib/progress";
 
@@ -60,6 +62,7 @@ const activity = (mode: Mode) =>
 export default function Home() {
   const [phase, setPhase] = useState<Phase>("landing");
   const [coachStep, setCoachStep] = useState<"setup" | "progress">("setup");
+  const [coachPersonality, setCoachPersonality] = useState<CoachId>("supportive");
   const [settings, setSettings] = useState<Settings>(defaults);
   const [scores, setScores] = useState([0, 0]);
   const [winner, setWinner] = useState<number | null>(null);
@@ -404,6 +407,9 @@ export default function Home() {
           <span className="brand-dot">®</span>
         </button>
         <div className="header-right">
+          <a className="text-button" href="/leaderboard">
+            Leaderboard
+          </a>
           <span className="edition">THE EXTRAORDINARILY ORDINARY</span>
           <span className="live-pill">
             <i /> EL NETWORK
@@ -415,36 +421,30 @@ export default function Home() {
           <section className="hero">
             <div className="hero-copy">
               <div className="eyebrow">
-                <span /> WORLD-CLASS COVERAGE. LIVING-ROOM TALENT.
+                <span /> GUIDED MOVEMENT COACHING
               </div>
               <h1>
-                BIG LEAGUE
+                TRAIN THE
                 <br />
-                ENERGY.
-                <br />
-                <em>
-                  EVERYDAY
-                  <br />
-                  ATHLETES.
-                </em>
+                <em>REP.</em>
               </h1>
               <p>
-                Your room. Your rivals. Your ridiculously dramatic AI
-                sportscaster. Or switch to guided coaching, where control beats
-                a pile of sloppy repetitions.
+                Calibrate a comfortable target, score the quality of the
+                movement, and hear a coach respond to what actually changed.
+                Arcade timing is still here when you want it.
               </p>
               <div className="hero-actions">
-                <button className="primary" onClick={() => setPhase("setup")}>
-                  Start Broadcasting <ArrowRight size={19} />
-                </button>
                 <button
-                  className="secondary"
+                  className="primary"
                   onClick={() => {
                     setCoachStep("setup");
                     setPhase("coach");
                   }}
                 >
-                  Guided Coach
+                  Start Training <ArrowRight size={19} />
+                </button>
+                <button className="secondary" onClick={() => setPhase("setup")}>
+                  Arcade Championship
                 </button>
                 <button
                   className="text-button"
@@ -455,6 +455,25 @@ export default function Home() {
                 >
                   Progress
                 </button>
+                <a className="text-button" href="/leaderboard">
+                  Quality board
+                </a>
+              </div>
+              <div className="choice-row hero-coaches">
+                {COACHES.map((coach) => (
+                  <button
+                    key={coach.id}
+                    className="choice"
+                    onClick={() => {
+                      setCoachPersonality(coach.id);
+                      setCoachStep("setup");
+                      setPhase("coach");
+                    }}
+                  >
+                    <strong>{coach.name}</strong>
+                    <small>{coach.detail}</small>
+                  </button>
+                ))}
               </div>
               <div className="hero-meta">
                 <span>
@@ -564,15 +583,15 @@ export default function Home() {
               ],
               [
                 <AudioLines key="b" />,
-                "02 / MAKE SOME NOISE",
-                "Every rep gets a storyline.",
-                "AI-powered play-by-play with championship-level enthusiasm.",
+                "02 / COACH",
+                "A voice that follows the set.",
+                "Four personalities respond to measured changes, then stay quiet.",
               ],
               [
                 <Trophy key="c" />,
-                "03 / CLAIM THE GLORY",
-                "Settle absolutely nothing.",
-                "Go head-to-head or chase your own personal living-room best.",
+                "03 / QUALITY",
+                "Control beats a rushed rep.",
+                "Public boards rank form quality, with consistency as the tiebreaker.",
               ],
             ].map(([icon, label, title, text], i) => (
               <article key={i}>
@@ -703,6 +722,9 @@ export default function Home() {
                 Local arena. No account. No video uploads. Just you and an
                 unreasonable amount of glory.
               </p>
+              <a className="text-button" href="/leaderboard">
+                SanD Hacks Championship
+              </a>
               <div className="source-options">
                 <label>
                   <input
@@ -1004,6 +1026,19 @@ export default function Home() {
                 : `${settings.names[winner ?? 0]} takes the crown. The trophy is imaginary. The bragging rights are very real.`}
             </p>
           </div>
+          <LeaderboardSubmit
+            demo={settings.demo}
+            experience="arcade"
+            exercise={settings.mode}
+            exerciseLabel={activity(settings.mode)}
+            challenge="timed"
+            challengeLabel="Timed championship"
+            average={null}
+            reps={scores[winner ?? 0] ?? 0}
+            target={null}
+            durationSec={settings.duration}
+            suggestedName={settings.names[winner ?? 0] || settings.names[0]}
+          />
           <div className="result-actions">
             <button className="primary" onClick={prepare}>
               <RotateCcw size={18} /> Run it back
@@ -1011,6 +1046,9 @@ export default function Home() {
             <button className="secondary" onClick={reset}>
               Change the lineup
             </button>
+            <a className="text-button" href="/leaderboard">
+              Championship board
+            </a>
           </div>
           <details>
             <summary>Broadcast transcript ({transcript.length})</summary>
@@ -1022,8 +1060,9 @@ export default function Home() {
       )}
       {phase === "coach" && (
         <CoachFlow
-          key={coachStep}
+          key={`${coachStep}-${coachPersonality}`}
           initialStep={coachStep}
+          initialPersonality={coachPersonality}
           onExit={() => setPhase("landing")}
           onArcade={() => setPhase("setup")}
         />
