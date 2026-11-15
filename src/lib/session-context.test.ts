@@ -31,6 +31,7 @@ describe("session coaching", () => {
     const first = decide(session, rep());
     expect(first.speak).toBe(true);
     expect(first.focus).toBe("first");
+    expect(renderLine(session, first)).not.toContain("Alex");
     session = rememberComment(session, first.key, renderLine(session, first));
     session = applyRep(session, rep({ quality: 82 }));
     expect(decide(session, rep({ quality: 82 })).speak).toBe(false);
@@ -58,6 +59,7 @@ describe("session coaching", () => {
     const decision = decide(session, fast);
     expect(decision.focus).toBe("control");
     expect(renderLine(session, decision)).toContain("slowly");
+    expect(renderLine(session, decision)).not.toContain("Alex");
     expect(renderLine(session, decision).toLowerCase()).not.toMatch(/living room|crowd|history/);
     session = rememberComment(session, decision.key, renderLine(session, decision));
     session = applyRep(session, fast);
@@ -78,5 +80,6 @@ describe("session coaching", () => {
     const decision = decide(session);
     expect(decision.safety).toBe(true);
     expect(renderLine(session, decision)).toContain("shoulders");
+    expect(renderLine(session, decision)).not.toContain("Alex");
   });
 });

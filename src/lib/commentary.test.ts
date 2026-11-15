@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CommentaryQueue, coachCommentary, commentaryFor } from "./commentary";
+import { CommentaryQueue, coachCommentary, commentaryFor, duelResultLine } from "./commentary";
 import type { GameEvent } from "./engine";
 const event = (type: string, scores = [5, 4]): GameEvent => ({
   id: "1",
@@ -40,7 +40,7 @@ describe("event commentary", () => {
     ).toBeNull();
     expect(
       commentaryFor(event("REP_COMPLETED"), ["Ada", "Max"], "hype"),
-    ).toContain("Ada reaches 5");
+    ).toBe("5 complete repetitions. An unstoppable household force!");
   });
   it("uses actual winners and ties", () => {
     expect(
@@ -68,7 +68,9 @@ describe("coach personalities", () => {
         quality: 92,
         feedback: "Try lowering a little more slowly.",
       });
+      expect(intro).toContain("Alex");
       expect(intro.toLowerCase()).toMatch(/stop|pain/);
+      expect(rep).not.toContain("Alex");
       expect(`${intro} ${rep}`.toLowerCase()).not.toMatch(
         /ignore pain|push through|no pain no gain/,
       );
@@ -143,6 +145,17 @@ describe("coach personalities", () => {
         feedback: "I couldn't clearly see the required landmarks.",
       }),
     ).toMatch(/Not scored/);
+  });
+});
+describe("head to head result", () => {
+  it("names the winner once and wishes the other person luck", () => {
+    expect(duelResultLine(["Ophir", "Sean"], 1, [4, 4])).toBe(
+      "Great job, Sean. Better luck next time, Ophir.",
+    );
+    expect(duelResultLine(["Ophir", "Sean"], null, [4, 4])).toBe(
+      "Even set. Great job to both of you.",
+    );
+    expect(duelResultLine(["Ophir", "Sean"], null, [0, 0])).toBeNull();
   });
 });
 describe("voice playback lifecycle", () => {

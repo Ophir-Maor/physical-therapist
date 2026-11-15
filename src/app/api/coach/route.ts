@@ -124,7 +124,7 @@ export async function POST(request: Request) {
         messages: [
           {
             role: "system",
-            content: `${instructions[data.personality]} Use only the JSON measurements. One or two short sentences. Never invent a form fault, injury, or diagnosis. Never tell the person to push through pain. If the fact is empty, stay quiet.`,
+            content: `${instructions[data.personality]} Use only the JSON measurements. One or two short sentences. Do not say the person's name. Never invent a form fault, injury, or diagnosis. Never tell the person to push through pain. If the fact is empty, stay quiet.`,
           },
           { role: "user", content: JSON.stringify(data) },
         ],

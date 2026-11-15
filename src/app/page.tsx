@@ -37,6 +37,7 @@ type Phase =
   | "calibration"
   | "countdown"
   | "active"
+  | "handoff"
   | "complete"
   | "coach";
 type Settings = {
@@ -66,6 +67,7 @@ export default function Home() {
   const [settings, setSettings] = useState<Settings>(defaults);
   const [scores, setScores] = useState([0, 0]);
   const [winner, setWinner] = useState<number | null>(null);
+  const [turn, setTurn] = useState(0);
   const [eventLog, setEventLog] = useState("");
   const [countdown, setCountdown] = useState(3);
   const [status, setStatus] = useState("Preparing the arena…");
@@ -96,6 +98,7 @@ export default function Home() {
   const audio = useRef<AudioContext | null>(null);
   const lastDebug = useRef(0);
   const regKey = useRef("");
+  const turnRef = useRef(0);
   const debugRef = useRef(debug);
   useEffect(() => {
     debugRef.current = debug;
@@ -204,6 +207,18 @@ export default function Home() {
           .join("\n"),
       );
     processed.current = game.events.length;
+    if (
+      settingsRef.current.players === 2 &&
+      phaseRef.current === "active" &&
+      game.state === "active" &&
+      game.scores[turnRef.current] >= game.goal
+    ) {
+      phaseRef.current = "handoff";
+      setPhase("handoff");
+      setCaption(
+        `${settingsRef.current.names[turnRef.current]} is done. One person at a time.`,
+      );
+    }
     if (game.state === "complete" && phaseRef.current !== "complete") {
       phaseRef.current = "complete";
       setWinner(game.winner);
@@ -262,6 +277,11 @@ export default function Home() {
   const onPoses = useCallback(
     (poses: Landmark[][], timestamp: number) => {
       let assigned = tracker.current?.update(poses, timestamp) || [];
+      if (settingsRef.current.players === 2) {
+        const pose = assigned[0] ?? null;
+        assigned = [null, null];
+        assigned[turnRef.current] = pose;
+      }
       if (registrar.current) {
         const observed = registrar.current.update(poses, timestamp);
         assigned = observed.assigned;
@@ -329,22 +349,24 @@ export default function Home() {
     }
     if (!audio.current) audio.current = new AudioContext();
     void audio.current.resume();
+    turnRef.current = 0;
+    setTurn(0);
     engine.current = new GameEngine({
       goal: clean.goal,
       players: clean.names.slice(0, clean.players),
+      sequential: clean.players === 2,
     });
-    tracker.current = new PlayerTracker(clean.players);
-    registrar.current =
-      !clean.demo && clean.players === 2 ? new IdentityRegistrar(2) : null;
+    tracker.current = new PlayerTracker(clean.players === 2 ? 1 : clean.players);
+    registrar.current = null;
     regKey.current = "";
     setRegistering(Boolean(registrar.current));
     setRegStage("await-1");
-    setEnrolled(clean.demo || clean.players === 1);
+    setEnrolled(true);
     setRegReady(false);
     setRegAmbiguous(false);
     setRegMessage(
-      registrar.current
-        ? "Player 1, step into the frame alone."
+      clean.players === 2
+        ? `${clean.names[0]} goes first. ${clean.names[1]} steps in after that set.`
         : "",
     );
     detectors.current = Array.from(
@@ -363,7 +385,20 @@ export default function Home() {
     phaseRef.current = "setup";
     setPhase("setup");
   }
-  const inArena = ["calibration", "countdown", "active"].includes(phase);
+  const inArena = ["calibration", "countdown", "active", "handoff"].includes(phase);
+  function startNextAthlete() {
+    turnRef.current = 1;
+    setTurn(1);
+    detectors.current[1]?.reset();
+    setCountdown(3);
+    phaseRef.current = "countdown";
+    setPhase("countdown");
+  }
+  useEffect(() => {
+    if (phase !== "handoff" || !settings.demo) return;
+    const id = window.setTimeout(() => startNextAthlete(), 700);
+    return () => window.clearTimeout(id);
+  }, [phase, settings.demo]);
   return (
     <main>
       <header className="topbar">
@@ -386,9 +421,6 @@ export default function Home() {
             Leaderboard
           </a>
           <span className="edition">THE EXTRAORDINARILY ORDINARY</span>
-          <span className="live-pill">
-            <i /> EL NETWORK
-          </span>
         </div>
       </header>
       {phase === "landing" && (
@@ -579,35 +611,6 @@ export default function Home() {
             <span>YOUR EVERYDAY DESERVES A REPLAY</span>
             <b>✳</b>
           </div>
-          <section className="features">
-            {[
-              [
-                <Crosshair key="a" />,
-                "01 / MOVE",
-                "Your body is the controller.",
-                "Real-time pose tracking turns complete movements into points.",
-              ],
-              [
-                <AudioLines key="b" />,
-                "02 / COACH",
-                "A voice that follows the set.",
-                "Four personalities respond to measured changes, then stay quiet.",
-              ],
-              [
-                <Trophy key="c" />,
-                "03 / QUALITY",
-                "Control beats a rushed rep.",
-                "Public boards rank form quality, with consistency as the tiebreaker.",
-              ],
-            ].map(([icon, label, title, text], i) => (
-              <article key={i}>
-                {icon}
-                <span>{label}</span>
-                <h3>{title}</h3>
-                <p>{text}</p>
-              </article>
-            ))}
-          </section>
         </>
       )}
       {phase === "setup" && (
@@ -654,7 +657,7 @@ export default function Home() {
                     className={settings.players === players ? "selected" : ""}
                     onClick={() => setSettings({ ...settings, players })}
                   >
-                    {players === 1 ? "Solo practice" : "Head to head"}
+                    {players === 1 ? "Solo practice" : "One at a time"}
                   </button>
                 ))}
               </div>
@@ -794,19 +797,30 @@ export default function Home() {
           <div className="scoreboard">
             <div className="player blue">
               <span>
-                PLAYER 01 / {settings.players === 1 ? "PRACTICE" : "HOME"}
+                PLAYER 01 /{" "}
+                {settings.players === 1
+                  ? "PRACTICE"
+                  : turn === 0
+                    ? "NOW"
+                    : "DONE"}
               </span>
               <strong>{settings.names[0]}</strong>
               <b>{scores[0]}</b>
             </div>
             <div className="score-focus">
-              <span>{phase === "active" ? "RACE TO THE TARGET" : "PRE-GAME"}</span>
+              <span>
+                {phase === "handoff"
+                  ? "SWITCH ATHLETES"
+                  : phase === "active"
+                    ? "RACE TO THE TARGET"
+                    : "PRE-GAME"}
+              </span>
               <b>{settings.goal}</b>
               <small>COMPLETE REPS TO WIN</small>
             </div>
             {settings.players === 2 ? (
               <div className="player red">
-                <span>PLAYER 02 / AWAY</span>
+                <span>PLAYER 02 / {turn === 1 ? "NOW" : "NEXT"}</span>
                 <strong>{settings.names[1]}</strong>
                 <b>{scores[1]}</b>
               </div>
@@ -821,7 +835,8 @@ export default function Home() {
             <div className="camera-shell">
               <VisionStage
                 demo={settings.demo}
-                players={settings.players}
+                players={settings.players === 2 ? 1 : settings.players}
+                demoPlayer={turn}
                 mode={settings.mode}
                 running={phase === "active"}
                 overlay={registering ? overlay : undefined}
@@ -859,9 +874,9 @@ export default function Home() {
                     </p>
                     {regMessage && <p>{regMessage}</p>}
                     <small>
-                      Player 1 starts on the left of the preview. Live
-                      two-player matches register one person at a time. Stay in
-                      your lane after that.
+                      {settings.players === 2
+                        ? `${settings.names[0]} takes the whole frame first. ${settings.names[1]} steps in only after that set.`
+                        : "One person in frame. The camera follows whoever is practicing."}
                     </small>
                     {registering && !enrolled && (
                       <button
@@ -905,6 +920,22 @@ export default function Home() {
                         }}
                       >
                         Switch to one-player setup
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+              {phase === "handoff" && (
+                <div className="calibration-overlay">
+                  <div className="calibration-card">
+                    <h3>{settings.names[1]} is up.</h3>
+                    <p>
+                      {settings.names[0]} finished with {scores[0]} reps. Step
+                      in alone. The camera tracks one person at a time.
+                    </p>
+                    {!settings.demo && (
+                      <button className="primary" onClick={startNextAthlete}>
+                        Start {settings.names[1]} <ArrowRight size={18} />
                       </button>
                     )}
                   </div>
