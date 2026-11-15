@@ -19,6 +19,8 @@ npm install
 npm run dev
 ```
 
+`README.md` is only the short start guide. Behavior and verification stay in this file.
+
 Open http://localhost:3000. `http://127.0.0.1:3000` is also allowed in dev (`allowedDevOrigins`). Using the other host used to load the page with no JavaScript, so buttons did nothing. Hard-refresh after a dev-server restart.
 
 - The header no longer shows “THE EXTRAORDINARILY ORDINARY.” That corner is empty on the home page and every Guided Coach screen that uses the same header. The ® beside Everyday League is removed from that header. The open page header was checked and showed Everyday League with no ®. The championship page did not have that line. The open page header was checked on November 15 and showed only the Everyday League name.
