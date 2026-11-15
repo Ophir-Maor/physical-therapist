@@ -418,9 +418,6 @@ export default function Home() {
           <span className="brand-dot">®</span>
         </button>
         <div className="header-right">
-          <a className="text-button" href="/leaderboard">
-            Leaderboard
-          </a>
           <span className="edition">THE EXTRAORDINARILY ORDINARY</span>
         </div>
       </header>

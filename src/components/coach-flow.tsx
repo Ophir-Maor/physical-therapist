@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowRight, ChevronLeft, Pause, Play } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronLeft, ChevronUp, Pause, Play } from "lucide-react";
 import ExerciseDemo from "@/components/exercise-demo";
 import LeaderboardSubmit from "@/components/leaderboard-submit";
 import PoseAvatar from "@/components/pose-avatar";
@@ -764,7 +764,7 @@ export default function CoachFlow({
               </p>
               <button
                 type="button"
-                className="secondary"
+                className="secondary coach-preview"
                 onClick={() => {
                   voice.current?.unlock();
                   voice.current!.personality = settings.personality;
@@ -802,16 +802,54 @@ export default function CoachFlow({
                 {CHALLENGES.find((challenge) => challenge.id === settings.challenge)?.detail}
               </p>
               <label className="field-label">05 / SCORED REPS</label>
-              <div className="choice-row">
-                {[4, 6, 8].map((goal) => (
-                  <button
-                    key={goal}
-                    className={`choice ${settings.goal === goal ? "selected" : ""}`}
-                    onClick={() => setSettings({ ...settings, goal })}
-                  >
-                    <strong>{goal} quality reps</strong>
-                  </button>
-                ))}
+              <div className="rep-stepper">
+                <div className="rep-stepper-box">
+                  <input
+                    aria-label="Scored reps"
+                    type="number"
+                    min={1}
+                    max={99}
+                    inputMode="numeric"
+                    value={settings.goal}
+                    onChange={(event) => {
+                      const next = Number(event.target.value);
+                      if (!Number.isInteger(next)) return;
+                      setSettings({
+                        ...settings,
+                        goal: Math.min(99, Math.max(1, next)),
+                      });
+                    }}
+                  />
+                  <div className="rep-stepper-arrows">
+                    <button
+                      type="button"
+                      aria-label="Increase scored reps"
+                      disabled={settings.goal >= 99}
+                      onClick={() =>
+                        setSettings({
+                          ...settings,
+                          goal: Math.min(99, settings.goal + 1),
+                        })
+                      }
+                    >
+                      <ChevronUp size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Decrease scored reps"
+                      disabled={settings.goal <= 1}
+                      onClick={() =>
+                        setSettings({
+                          ...settings,
+                          goal: Math.max(1, settings.goal - 1),
+                        })
+                      }
+                    >
+                      <ChevronDown size={14} />
+                    </button>
+                  </div>
+                </div>
+                <span>quality reps</span>
               </div>
               <p className="disclaimer">
                 Experimental movement coaching, not a medical device. It does

@@ -8,7 +8,7 @@ test("guided demo scores control and keeps arcade available", async ({ page }) =
     page.getByRole("button", { name: /Hear Sarah.*introduce themselves/i }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Start Training" }).click();
-  await page.getByRole("button", { name: "4 quality reps" }).click();
+  await expect(page.getByLabel("Scored reps")).toHaveValue("4");
   await page.getByRole("button", { name: "Continue to demonstration" }).click();
   await expect(page.getByLabel("Animated skeleton demonstrating the exercise")).toBeVisible();
   await page.getByRole("button", { name: "Enter coach demo" }).click();
