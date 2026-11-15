@@ -4,7 +4,7 @@
 
 The Next.js App Router application is local-first and has two experiences on one vision and voice stack.
 
-- Arcade (`src/app/page.tsx`): phases `landing`, `setup`, `calibration`, `countdown`, `active`, `complete`. `GameEngine` still owns `idle`, `active`, and `complete`. A rep is one counted cycle.
+- Arcade (`src/app/page.tsx`): phases `landing`, `setup`, `calibration`, `countdown`, `active`, `complete`. `GameEngine` still owns `idle`, `active`, and `complete`. A rep is one counted open-and-close. Its points are `1 + form/100`, so a perfect rep is worth 2. The higher total wins.
 - Guided coach (`src/components/coach-flow.tsx`): setup, demonstration, registration or calibration, countdown, active set, results, progress. `FormEvaluator` owns movement phase and quality. A scored rep is a complete cycle whose landmarks were clear enough to measure.
 
 ```text
@@ -21,6 +21,16 @@ Optional: POST /api/leaderboard with nickname and score only
 ```
 
 Camera frames never enter a server route. Commentary is template text from structured events. There is no LLM. Coach copy is selected from the measured feedback string and the chosen personality.
+
+## Arcade scoring
+
+`src/lib/broadcast-score.ts` grades a completed arcade cycle. The open is worth 50 and the return is worth 35. On jumping jacks those split in half between the arms and the feet, and the lower wrist caps the arms. Arm raises put the whole 50 and 35 on the arms. A clean upright torso is the other 15. Lean can deduct all 15 of those points. Missing hips skip that deduction.
+
+The old open and close gates still decide that a cycle happened. Just clearing them scores about 40 form, worth 1.4 points. Wrists at head height, feet about twice shoulder width, and a full return score 100. An arm raise also loses up to 30 form points when the lift and lower take 600 ms or less. A raise that takes 1.2 seconds or longer keeps those points. Jumping jacks are not paced. A one-frame blink keeps the cycle. The open is accepted as soon as the smoothed pose crosses the line, and the grade uses the best open in that attempt. Noise that never holds a return still scores nothing.
+
+The match cannot start until the required body is in frame. If either player stays incomplete for about half a second, `GameEngine` pauses time and scoring for both. It resumes when both are fully back. The screen names who has to step in. Live meters follow the smoothed pose in both directions and keep a mark at the best of the attempt. The flash is the number that is added. The announcer mentions form only in the final call.
+
+Guided Coach does not use this grade.
 
 ## Form scoring
 
@@ -68,17 +78,17 @@ Synthetic mode never opens a camera or initializes MediaPipe. Its fixture athlet
 
 ## Recognition and identity
 
-`ActivityDetector.update(landmarks, timestamp)` returns repetition events. The timestamp unit is milliseconds. A complete, held closed → open → closed sequence is required. Defaults include confidence 0.55, EMA smoothing 0.55, phase hold 100 ms, minimum cycle 500 ms, and reset after 700 ms of missing input. Shoulder-width ratios normalize wrist and ankle thresholds; geometry/timing settings can be overridden with the optional constructor configuration.
+`ActivityDetector.update(landmarks, timestamp)` returns repetition events. The timestamp unit is milliseconds. A complete closed → open → closed sequence is required. The open is accepted on the frame the smoothed pose crosses the line. A missing frame of about 200 ms does not clear that attempt. The return still has to hold for 100 ms, the cycle has to last at least 500 ms, and landmarks missing for 700 ms reset the attempt. Confidence default is 0.55 and smoothing is 0.55.
 
-Jumping jacks require wrists above shoulders and feet spread for the open position, wrists lowered and feet together for closed, with a basic upright torso/legs check. Arm raises use shoulders and wrists only. Neutral poses do not score. These are heuristic counters and do not certify exercise technique.
+Jumping jacks require wrists above shoulders and feet spread for the open position, wrists lowered and feet together for closed, with a basic upright torso/legs check. Arm-raise cycles use shoulders and wrists. The arcade start gate also requires hips so lean can be judged. Neutral poses do not score. These are heuristic counters and do not certify exercise technique.
 
 `PlayerTracker` considers torso center and proximity to previous positions; it is independent of MediaPipe array order. In two-player mode initial screen lanes are left/right. After a two-second absence it falls back to the original lane anchor. There is no appearance or biometric identity tracking. Crossings and long occlusions remain ambiguous, so players must remain in their lanes.
 
 ## Match rules
 
-`GameEngine` receives duration in seconds and monotonic timestamp arguments in milliseconds. `tick` derives remaining time from elapsed time rather than decrementing a counter. `rep` ticks first, rejecting repetitions at or beyond the buzzer. Event payloads snapshot scores; types cover start, reps, five-rep milestones, lead changes, ties, halftime, final ten seconds, and completion. Winner is a player index or `null` for a versus draw. Solo completion selects player zero. Reset clears match state and events.
+`GameEngine` receives duration in seconds and monotonic timestamp arguments in milliseconds. `tick` derives remaining time from elapsed time rather than decrementing a counter. `rep` ticks first, rejecting repetitions at or beyond the buzzer, and adds `1 + form/100`. Milestones follow the rep count. Event payloads snapshot scores, rep counts, and form averages. Winner is the higher point total, or `null` for a versus draw. Solo completion selects player zero. Reset clears match state and events.
 
-UI timers refresh independently from pose inference, so a lost camera does not stop match time. The browser may throttle background tabs; elapsed-time calculation catches up when execution resumes. There is no pause/resume feature.
+If either arcade player is out of frame for about half a second, `pause` stops time and scoring for both. `resume` continues from the remaining time. A lost camera therefore holds the clock until both required bodies are back. The browser may throttle background tabs; elapsed-time calculation catches up when execution resumes. Guided Coach still has its own manual pause.
 
 ## Commentary and API
 

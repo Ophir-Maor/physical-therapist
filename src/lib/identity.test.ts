@@ -46,6 +46,15 @@ describe("sequential registration", () => {
     registrar.reregister();
     expect(registrar.stage).toBe("await-1");
   });
+  it("still confirms for a few seconds after the player leans out", () => {
+    const registrar = new IdentityRegistrar(2);
+    const left = syntheticPose(false, 0.25);
+    registrar.update([left], 1000);
+    expect(registrar.update([], 2000).readyToConfirm).toBe(true);
+    expect(registrar.confirm(2000)).toBe(true);
+    expect(registrar.stage).toBe("await-2");
+    expect(registrar.update([], 12000).readyToConfirm).toBe(false);
+  });
   it("supports one player", () => {
     const registrar = new IdentityRegistrar(1);
     expect(registrar.update([], 0).readyToConfirm).toBe(false);

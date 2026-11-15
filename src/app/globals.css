@@ -579,8 +579,8 @@ select {
   display: flex;
   background: #161b1d;
   border: 1px solid var(--line);
-  margin-bottom: 20px;
-  height: 120px;
+  margin-bottom: 12px;
+  min-height: 132px;
 }
 .player {
   flex: 1;
@@ -613,10 +613,16 @@ select {
 .player > b {
   position: absolute;
   right: 25px;
-  top: 18px;
-  font-size: 64px;
+  top: 28px;
+  font-size: 52px;
   font-weight: 900;
-  letter-spacing: -3px;
+  letter-spacing: -2px;
+}
+.player-meta {
+  display: block;
+  margin-top: 8px;
+  color: #c5ced4;
+  font: 12px monospace;
 }
 .player.red > b {
   left: 25px;
@@ -769,6 +775,137 @@ select {
 .calibration-card .primary {
   margin-top: 18px;
   padding: 12px 20px;
+}
+.form-meters {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.meter-player {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px 12px;
+  background: #161b1d;
+  border: 1px solid var(--line);
+}
+.meter-player > span {
+  font: 10px monospace;
+  letter-spacing: 1px;
+}
+.meter {
+  margin-top: 8px;
+}
+.meter span {
+  font: 9px monospace;
+  letter-spacing: 1px;
+  color: #929da5;
+}
+.meter-track {
+  position: relative;
+  height: 8px;
+  margin-top: 4px;
+  background: #0c1011;
+  border: 1px solid var(--line);
+}
+.meter-fill {
+  height: 100%;
+  background: currentColor;
+}
+.meter-best {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 14px;
+  background: var(--lime);
+}
+.pace-fast {
+  color: #ff5d6c;
+  border-color: #ff5d6c;
+}
+.pace-slow {
+  color: #f0c14a;
+  border-color: #f0c14a;
+}
+.pace-good {
+  color: var(--lime);
+  border-color: var(--lime);
+}
+.live-cues {
+  position: absolute;
+  top: 58px;
+  left: 50%;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 92%;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.live-cues-pair {
+  width: 0;
+  transform: none;
+}
+.live-cues-pair .pace-overlay {
+  position: absolute;
+  top: 0;
+  right: 5px;
+  align-items: flex-end;
+  width: max-content;
+}
+.live-cues-pair .rep-flash {
+  position: absolute;
+  top: 0;
+  left: 5px;
+  white-space: nowrap;
+}
+.pace-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.pace-live {
+  margin: 0;
+  width: max-content;
+  min-width: 8em;
+  padding: 8px 14px;
+  background: #101614ee;
+  border: 1px solid currentColor;
+  font: 13px monospace;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  text-align: center;
+}
+.cue-held {
+  visibility: hidden;
+}
+.rep-flash,
+.pause-overlay {
+  background: #101614ee;
+  border: 1px solid var(--lime);
+  color: var(--lime);
+  font: 13px monospace;
+  letter-spacing: 1px;
+  padding: 8px 14px;
+}
+.pause-overlay {
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  z-index: 3;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  max-width: 80%;
+  pointer-events: none;
+}
+.pause-overlay b {
+  color: white;
+  font: 16px/1.4 monospace;
 }
 .countdown-overlay {
   position: absolute;
@@ -1159,7 +1296,10 @@ select {
     font-size: 36px;
   }
   .scoreboard {
-    height: 100px;
+    min-height: 108px;
+  }
+  .form-meters {
+    flex-direction: column;
   }
   .player {
     padding: 13px 10px;
