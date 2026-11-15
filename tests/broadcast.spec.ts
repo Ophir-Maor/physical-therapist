@@ -26,7 +26,7 @@ test("demo uses detector pipeline through results and restart", async ({
   await page.screenshot({ path: "test-results/results.png", fullPage: true });
   await page.getByRole("button", { name: "Run it back" }).click();
   await expect(page.getByRole("button", { name: "Start match" })).toBeEnabled();
-  await expect(page.locator(".player b").first()).toHaveText("0");
+  await expect(page.locator(".player b").first()).toHaveText("0.0");
   expect(errors).toEqual([]);
 });
 test("solo arm raise setup and narrow layout", async ({ page }) => {
@@ -47,7 +47,7 @@ test("solo arm raise setup and narrow layout", async ({ page }) => {
     ),
   ).toBe(true);
   await page.getByRole("button", { name: "Start match" }).click();
-  await expect(page.getByRole("heading", { name: /WINS\./ })).toBeVisible({
+  await expect(page.getByRole("heading", { name: "YOUR SCORE." })).toBeVisible({
     timeout: 25000,
   });
   await expect(page.locator(".final-scores b")).not.toHaveText("0");

@@ -302,10 +302,11 @@ function VisionStage({
         const required =
           live.current.exercise === "squats"
             ? [23, 24, 25, 26, 27, 28]
-            : live.current.mode === "arm-raises" ||
-                live.current.exercise === "arm-raises"
+            : live.current.exercise === "arm-raises"
               ? [11, 12, 15, 16]
-              : [11, 12, 15, 16, 23, 24, 27, 28];
+              : live.current.mode === "arm-raises"
+                ? [11, 12, 15, 16, 23, 24]
+                : [11, 12, 15, 16, 23, 24, 27, 28];
         const valid = poses.filter((pose) =>
           required.every((i) => (pose[i]?.visibility ?? 0) >= 0.55),
         ).length;
@@ -316,9 +317,10 @@ function VisionStage({
               ? `${valid}/${players} players ready. Separate into left and right lanes, or switch to practice.`
               : live.current.exercise === "squats"
                 ? "Step back until hips, knees, and feet are visible."
-                : live.current.mode === "arm-raises" ||
-                    live.current.exercise === "arm-raises"
-                  ? "Show both shoulders and hands to the camera."
+                : live.current.exercise === "arm-raises"
+                ? "Show both shoulders and hands to the camera."
+                : live.current.mode === "arm-raises"
+                  ? "Step back until shoulders, hands, and hips are visible."
                   : "Step back until shoulders, hands, hips and feet are visible.",
           valid >= players,
         );
