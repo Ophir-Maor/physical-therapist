@@ -4,7 +4,7 @@ test("guided demo scores control and keeps arcade available", async ({ page }) =
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
-  await page.getByRole("button", { name: "Guided Coach" }).click();
+  await page.getByRole("button", { name: "Start Training" }).click();
   await page.getByRole("button", { name: "4 quality reps" }).click();
   await page.getByRole("button", { name: "Continue to demonstration" }).click();
   await expect(page.getByLabel("Animated skeleton demonstrating the exercise")).toBeVisible();
@@ -22,7 +22,7 @@ test("guided demo scores control and keeps arcade available", async ({ page }) =
   });
   await expect(page.locator(".final-scores b").first()).not.toHaveText("—");
   await page.getByRole("button", { name: "Everyday League home" }).click();
-  await page.getByRole("button", { name: "Start Broadcasting" }).click();
+  await page.getByRole("button", { name: "Arcade Championship" }).click();
   await expect(page.getByRole("button", { name: "Enter Demo Arena" })).toBeVisible();
   expect(errors).toEqual([]);
 });
