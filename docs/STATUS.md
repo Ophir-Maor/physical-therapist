@@ -6,8 +6,8 @@ This is a movement-coaching prototype. It is not a medical device, does not diag
 
 ## Critical restrictions
 
-- Git exists in this directory. The current branch is `ophir`, tracking `origin/ophir`; it contains the guided-coaching, contextual voice, quality-leaderboard, rep-only arcade, and split-screen avatar work. Branch `feature/gamified-coaching` remains at `87230c5`. Do not commit, push, force-push, delete branches, or deploy unless the user explicitly asks.
-- `main` tracks `origin/main`. Do not overwrite that history.
+- Git exists in this directory. The checked-out branch is `ophir` at `1a179cf`, the same commit as local `main` and `origin/main` (pull request #4). It contains the guided-coaching, contextual voice, quality-leaderboard, rep-only arcade, and split-screen avatar work. `ophir` is one commit ahead of `origin/ophir` (`046c9ec`) because that extra commit is GitHub's merge of this branch into `main`. It has not been pushed. Branch `feature/gamified-coaching` remains at `87230c5`. Do not commit, push, force-push, delete branches, or deploy unless the user explicitly asks.
+- `main` matches `origin/main` at `1a179cf`. Do not overwrite that history.
 - Local implementation, dependency installation, servers, and testing are authorized.
 - Keep this file current at the end of subsequent work. Read `AGENTS.md` before continuing.
 
@@ -27,7 +27,7 @@ Open http://localhost:3000. `http://127.0.0.1:3000` is also allowed in dev (`all
 - Demo Mode needs neither a camera nor API keys. Live webcam is requested only after the user chooses it and continues.
 - The landing page’s right-hand “GO BIG” illustration is replaced by the live championship board for the selected exercise and challenge. It uses the same `/api/leaderboard` top 10, and **Open full board** keeps that category.
 - Guided Coach setup uses dropdowns for coach and challenge. Exercise, player count, and scored-rep count stay as buttons. The selected coach and challenge each keep one line of detail.
-- On Session Results, Championship board uses the same outlined button style as Progress. It still opens `/leaderboard`. The results heading is `Session Results`. The “Scores are approximate…” line, the recap line “These quality estimates are experimental, not a clinical grade.”, and the live coaching cue (the “Player 1, …” sentence) are removed from Session Results. The cue still appears during the session. The setup disclaimer and footer remain.
+- The merge of `origin` into `Sean` kept the teammate Session Results layout in `src/components/coach-flow.tsx`. Two players get a win, even-set, or stopped heading plus a score-per-rep table. A solo session keeps “Session results”, the quality report, the coaching cue, and the recap. Championship board still uses the outlined Progress button style and opens `/leaderboard`.
 
 Real voice is configured in gitignored `.env.local` (`ELEVENLABS_API_KEY`; voice IDs stay on the built-in Sarah, Callum, Charlie, and River presets unless overridden). Restart Next.js after any env change. On November 14, after adding the key and restarting, short speech requests for supportive, drill, hype, and calm each returned HTTP 200 `audio/mpeg`. Playback through the speakers was not checked. The key is not in client code, docs, or git. Missing credentials or an upstream failure use labeled browser speech and captions. Camera frames never leave the browser. Only the commentary sentence and personality name are sent to ElevenLabs.
 
@@ -140,6 +140,29 @@ ElevenLabs stays on `eleven_flash_v2_5`. One calm cue was also generated with `e
 - `.env.local` is present and gitignored. ElevenLabs key/model/voice variables and Neon pooled/unpooled connection variables are non-empty. Values were not printed or modified. The ElevenLabs route configuration and Neon round-trip test were verified; no new audible browser playback or physical-webcam test was performed.
 - This intake changed only this status document. Application functionality, credentials, Git index/history, and remote branches were not modified.
 
+## Sync and verification on November 14, evening
+
+- The working tree on `ophir` was clean before the fetch. There was no stash. Ignored local files, including `.env.local` and `.neon`, were not touched.
+- `git fetch origin` advanced `origin/main` from `e0cf608` to `1a179cf` (`Merge pull request #4 from Ophir-Maor/ophir`). That commit's tree is identical to the previous `ophir` tip (`9442eb1`). Fast-forwarded local `ophir` and local `main` to `1a179cf`. No conflicts, no file changes, and no push.
+- `npm run typecheck` and `npm run lint` passed. `npm test` passed: 10 files, 64 tests. The credentialed Neon round trip ran (about 1.3 seconds) and deleted its temporary rows.
+- Playwright did not start on the first attempt: `next dev` hit `EMFILE: too many open files`, and Chromium was missing from the sandbox browser cache. After the dev server was started with file polling and Playwright used the user browser cache, `npx playwright test --workers=1` passed all 6 tests in 57.2 seconds.
+- No application functionality was changed and nothing was committed.
+
+## Guided Coach navigation on November 14, evening
+
+- On Guided Coach setup, **Back to the network** and **Championship board** were inline with no gap, so the labels ran together. They now sit in a flex row with a divider and stay on one line at 390px width.
+- Checked in the browser: Back returns to the landing page, Championship board opens `/leaderboard`, and that page's Back link returns home. Desktop and phone layouts were both checked.
+
+## Voice and header on November 14, evening
+
+- Coaching speech says the athlete's name only in the opening line. Rep cues, camera reminders, the recap, and the stop line no longer use it. Arcade calls at every fifth rep and at halfway no longer use it. A lead change and the final result still name the athlete so a two-player match can tell who is ahead. The optional model prompt also tells the model not to say the name.
+- The header **EL NETWORK** pill is removed. The landing page was reloaded and the label is gone.
+- The landing-page feature row (Move, Coach, Quality) is removed. The ticker under the hero remains. Reloading the landing page confirmed those three blurbs are gone.
+- Guided Coach results include a score-per-rep table for each athlete. Unscored repetitions stay labeled unscored. The guided demo Playwright journey checks that Alex's table is present and contains at least one numeric score.
+- Two-player arcade and Guided Coach now run one athlete at a time. The camera tracks a single person. The second athlete steps in only after the first reaches the rep goal. Live play waits for a start button. Demo play advances on its own. A simultaneous two-person match is no longer started.
+- A finished head-to-head coach screen says who won, keeps both scores and the per-rep tables, and drops the recap, badges, and clinical disclaimer. The coach says "Great job, [winner]. Better luck next time, [loser]." A tie says it was even. Solo results still use the longer quality report, without that clinical line.
+- `npx vitest run` on the commentary, session, and coach-route tests passed: 13 tests.
+
 ## Optional coach-introduction verification on November 14
 
 - `npm run typecheck`, `npm run lint`, `npm test`, and `npm run build` passed after the landing-page introduction controls were added. Vitest: 10 files and 64 tests passed, including distinct, named, safety-bounded introductions for all four personalities and the live Neon round trip.
@@ -180,11 +203,12 @@ ElevenLabs stays on `eleven_flash_v2_5`. One calm cue was also generated with `e
 6. Arcade still has no pause. Coach pause freezes demo motion and stops feeding the evaluator; internal timestamps exclude the paused interval from movement analysis and stored session metadata.
 7. Speech rate limiting, the audio cache, and the leaderboard limiter are process-local. There is no login. Browser-submitted scores can be forged. Do not treat the board as officiated.
 8. `npm audit` was not re-run. The previous handoff reported 7 moderate findings in the dev ESLint chain. Do not claim a clean audit.
-9. ElevenLabs voice wiring, Neon setup, and the championship leaderboard after `87230c5` are uncommitted. `.env.local` is gitignored and must stay that way.
+9. ElevenLabs voice wiring, Neon setup, and the championship leaderboard are committed on `ophir` and merged to `origin/main` at `1a179cf`. `.env.local` is gitignored and must stay that way. Do not push `ophir` unless asked; it is one merge commit ahead of `origin/ophir`.
 10. The public board is self-reported. Movement scoring still happens in the browser. There is no account and no server-side pose check.
 11. Optional model dialogue is implemented but not live-tested. This environment has no `OPENAI_API_KEY` or Neon AI Gateway token, so coaching speech is deterministic.
 12. `eleven_turbo_v2_5` returned audio faster than Flash on one short cue. It was not listened to, so it is not the default.
 13. The movement avatar mirrors detected 2D landmarks, not the person’s appearance or true 3D biomechanics. Clothing, occlusion, camera angle, and pose-model error can move it incorrectly. The red overshoot state is coaching feedback against the user-selected target, not a safety or medical warning.
+14. The app cannot add field of view the webcam lens did not capture. A software fisheye would shrink the person and distort arm and knee angles without bringing cut-off feet into frame. On start, the live camera asks for an uncropped frame and the widest supported zoom. Cameras that do not expose those controls, including many built-in laptop cameras, stay at their native view. Arm raises only need shoulders and hands. Squats and jumping jacks still need the listed joints in frame.
 
 ## Next recommended steps
 

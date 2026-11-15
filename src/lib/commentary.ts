@@ -43,9 +43,9 @@ export function commentaryFor(
       "Balance returns to the competitive ecosystem.",
     ],
     HALFWAY_TO_GOAL: [
-      `${player} is halfway to the target! The living room can feel the momentum!`,
-      `${player} has completed half the required repetitions. Efficiently dramatic.`,
-      `${player} reaches the midpoint of the repetition target.`,
+      "Halfway to the target! The living room can feel the momentum!",
+      "Half the required repetitions are done. Efficiently dramatic.",
+      "The midpoint of the repetition target.",
     ],
     MATCH_FINISHED: tied
       ? [
@@ -66,8 +66,15 @@ export function commentaryFor(
           ],
   };
   if (event.type === "REP_COMPLETED" && score > 0 && score % 5 === 0)
-    return `${player} reaches ${score}! ${column[personality] === 0 ? "An unstoppable household force!" : column[personality] === 1 ? "The numbers are getting impressively larger." : "A sustained display of coordination."}`;
+    return `${score} complete repetitions. ${column[personality] === 0 ? "An unstoppable household force!" : column[personality] === 1 ? "The numbers are getting impressively larger." : "A sustained display of coordination."}`;
   return lines[event.type]?.[column[personality]] ?? null;
+}
+
+export function duelResultLine(names: string[], winner: number | null, scored: number[]) {
+  if (names.length < 2 || scored.every((count) => count < 1)) return null;
+  if (winner == null) return "Even set. Great job to both of you.";
+  const loser = winner === 0 ? 1 : 0;
+  return `Great job, ${names[winner]}. Better luck next time, ${names[loser]}.`;
 }
 
 export type { CoachPersonality } from "./session-context";
@@ -83,7 +90,8 @@ export function coachCommentary(input: {
 }) {
   if (input.type === "intro" || input.type === "preview" || input.type === "stop")
     return renderFixed(input.personality, input.type, input.name);
-  if (input.type === "visibility") return `${input.name}, ${input.feedback || "Step back so the camera can see the movement."}`;
+  if (input.type === "visibility")
+    return input.feedback || "Step back so the camera can see the movement.";
   if (input.type === "done") {
     const context = {
       name: input.name,
@@ -96,10 +104,10 @@ export function coachCommentary(input: {
     return renderRecap(context).replace(" 0 scored reps, ", " the set, ");
   }
   const fact = input.feedback || "Move only through a comfortable range.";
-  if (input.quality == null) return input.personality === "calm" ? `Not scored. ${fact}` : `${input.name}, I'll leave that one unscored. ${fact}`;
-  if (input.trend === "improved") return `That's smoother, ${input.name}. ${input.quality}. ${fact}`;
-  if (input.consistency === "steady") return `${input.name}, score ${input.quality}. Your last reps are lining up. ${fact}`;
-  return `${input.name}, ${input.quality}. ${fact}`;
+  if (input.quality == null) return input.personality === "calm" ? `Not scored. ${fact}` : `I'll leave that one unscored. ${fact}`;
+  if (input.trend === "improved") return `That's smoother. ${input.quality}. ${fact}`;
+  if (input.consistency === "steady") return `Score ${input.quality}. Your last reps are lining up. ${fact}`;
+  return `${input.quality}. ${fact}`;
 }
 
 interface Line {
