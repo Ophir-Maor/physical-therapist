@@ -5,7 +5,7 @@ import { allowsSameSite } from "../../../lib/same-origin";
 
 export const runtime = "nodejs";
 
-const exercises = z.enum(["arm-raises", "squats", "jumping-jacks"]);
+const exercises = z.enum(["arm-raises", "squats"]);
 const challenges = z.enum([
   "practice",
   "form",
@@ -18,7 +18,7 @@ const schema = z
     nickname: z.string().trim().min(1).max(24),
     exercise: exercises,
     challenge: challenges,
-    experience: z.enum(["coach", "arcade"]),
+    experience: z.literal("coach"),
     average: z.number().min(0).max(100).nullable(),
     reps: z.number().int().min(0).max(200),
     target: z.number().min(0).max(180).nullable(),
@@ -37,16 +37,8 @@ const schema = z
         message: "A quality score is required.",
         path: ["average"],
       });
-    if (value.experience === "arcade" && value.reps < 1)
-      ctx.addIssue({
-        code: "custom",
-        message: "At least one counted rep is required.",
-        path: ["reps"],
-      });
-    if (value.experience === "coach" && value.challenge === "reps")
+    if (value.challenge === "reps")
       ctx.addIssue({ code: "custom", message: "Coach sessions use quality challenges.", path: ["challenge"] });
-    if (value.experience === "arcade" && value.challenge !== "reps")
-      ctx.addIssue({ code: "custom", message: "Arcade sessions use the rep board.", path: ["challenge"] });
   });
 
 let windowStart = 0;
@@ -228,16 +220,8 @@ function filtersFrom(url: URL): Filters | null {
   const challenge = z
     .enum(["reps", "form", "consistency"])
     .safeParse(url.searchParams.get("challenge"));
-  const experience = z.enum(["coach", "arcade"]).safeParse(url.searchParams.get("experience"));
+  const experience = z.literal("coach").safeParse(url.searchParams.get("experience"));
   if (!exercise.success || !challenge.success || !experience.success) return null;
-  if (experience.data === "arcade") {
-    if (challenge.data !== "reps") return null;
-    return {
-      exercise: exercise.data,
-      challenge: "reps",
-      experience: "arcade",
-    };
-  }
   if (challenge.data === "reps") return null;
   return {
     exercise: exercise.data,
