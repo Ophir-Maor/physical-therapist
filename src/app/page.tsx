@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import VisionStage from "@/components/vision-stage";
 import CoachFlow from "@/components/coach-flow";
+import HeroBoard from "@/components/hero-board";
 import LeaderboardSubmit from "@/components/leaderboard-submit";
 import {
   ActivityDetector,
@@ -490,86 +491,7 @@ export default function Home() {
                 </span>
               </div>
             </div>
-            <div className="hero-art">
-              <div className="art-top">
-                <span className="live-pill">
-                  <i /> LIVE FROM YOUR LIVING ROOM
-                </span>
-                <span>CH. 001</span>
-              </div>
-              <div className="orbit orbit-one" />
-              <div className="orbit orbit-two" />
-              <div className="giant-type">
-                GO
-                <br />
-                BIG.
-              </div>
-              <div className="athlete">
-                <svg
-                  viewBox="0 0 300 360"
-                  aria-label="Original abstract athlete illustration"
-                >
-                  <defs>
-                    <linearGradient id="jersey" x2="1" y2="1">
-                      <stop stopColor="#dfff00" />
-                      <stop offset="1" stopColor="#a8c900" />
-                    </linearGradient>
-                  </defs>
-                  <circle cx="160" cy="63" r="27" fill="#e6b79a" />
-                  <path d="M137 49q20-30 45 1l-2-23-40-5z" fill="#191c22" />
-                  <path
-                    d="M136 99L185 99 207 201 128 208z"
-                    fill="url(#jersey)"
-                  />
-                  <path
-                    d="M139 109L96 90 48 35M184 109L224 79 255 26"
-                    stroke="#e6b79a"
-                    strokeWidth="21"
-                    fill="none"
-                    strokeLinecap="round"
-                  />
-                  <path
-                    d="M145 204L106 260 62 326M187 202L216 258 256 315"
-                    stroke="#eceee7"
-                    strokeWidth="29"
-                    fill="none"
-                    strokeLinecap="round"
-                  />
-                  <path
-                    d="M48 329L76 335M247 320L276 324"
-                    stroke="#dfff00"
-                    strokeWidth="18"
-                    strokeLinecap="round"
-                  />
-                  <text
-                    x="145"
-                    y="161"
-                    fill="#172000"
-                    fontSize="34"
-                    fontWeight="900"
-                  >
-                    01
-                  </text>
-                </svg>
-              </div>
-              <div className="tracking-label">
-                <Crosshair size={14} /> MAIN CHARACTER DETECTED
-              </div>
-              <div className="sample-caption">
-                “THE FORM? QUESTIONABLE.
-                <br />
-                THE COMMITMENT? ABSOLUTE.”<span>YOUR AI COMMENTATOR</span>
-              </div>
-              <div className="art-bottom">
-                <span>
-                  ALEX <b>12</b>
-                </span>
-                <small>VS</small>
-                <span>
-                  <b>09</b> JORDAN
-                </span>
-              </div>
-            </div>
+            <HeroBoard />
           </section>
           <div className="ticker">
             <span>NO STADIUM REQUIRED</span>

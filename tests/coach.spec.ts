@@ -26,7 +26,7 @@ test("guided demo scores control and keeps arcade available", async ({ page }) =
   await expect(page.getByTestId("quality-score")).not.toHaveText("—", {
     timeout: 25000,
   });
-  await expect(page.getByRole("heading", { name: "Session results" })).toBeVisible({
+  await expect(page.getByRole("heading", { name: "Session Results" })).toBeVisible({
     timeout: 30000,
   });
   await expect(page.locator(".final-scores b").first()).not.toHaveText("—");

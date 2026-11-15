@@ -673,21 +673,28 @@ export default function CoachFlow({
               )}
             </div>
             <div className="panel settings">
-              <label className="field-label">03 / COACH</label>
-              <div className="choice-row">
-                {COACHES.map((coach) => (
-                  <button
-                    key={coach.id}
-                    className={`choice ${settings.personality === coach.id ? "selected" : ""}`}
-                    onClick={() =>
-                      setSettings({ ...settings, personality: coach.id })
-                    }
-                  >
-                    <strong>{coach.name}</strong>
-                    <small>{coach.detail}</small>
-                  </button>
-                ))}
-              </div>
+              <label className="field-label">
+                03 / COACH
+                <select
+                  aria-label="Coach"
+                  value={settings.personality}
+                  onChange={(event) =>
+                    setSettings({
+                      ...settings,
+                      personality: event.target.value as CoachId,
+                    })
+                  }
+                >
+                  {COACHES.map((coach) => (
+                    <option key={coach.id} value={coach.id}>
+                      {coach.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="dropdown-detail">
+                {COACHES.find((coach) => coach.id === settings.personality)?.detail}
+              </p>
               <button
                 type="button"
                 className="secondary"
@@ -705,21 +712,28 @@ export default function CoachFlow({
               >
                 Hear {COACHES.find((coach) => coach.id === settings.personality)?.voiceName}&apos;s intro
               </button>
-              <label className="field-label">04 / CHALLENGE</label>
-              <div className="choice-row">
-                {CHALLENGES.map((challenge) => (
-                  <button
-                    key={challenge.id}
-                    className={`choice ${settings.challenge === challenge.id ? "selected" : ""}`}
-                    onClick={() =>
-                      setSettings({ ...settings, challenge: challenge.id })
-                    }
-                  >
-                    <strong>{challenge.name}</strong>
-                    <small>{challenge.detail}</small>
-                  </button>
-                ))}
-              </div>
+              <label className="field-label">
+                04 / CHALLENGE
+                <select
+                  aria-label="Challenge"
+                  value={settings.challenge}
+                  onChange={(event) =>
+                    setSettings({
+                      ...settings,
+                      challenge: event.target.value as ChallengeId,
+                    })
+                  }
+                >
+                  {CHALLENGES.map((challenge) => (
+                    <option key={challenge.id} value={challenge.id}>
+                      {challenge.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="dropdown-detail">
+                {CHALLENGES.find((challenge) => challenge.id === settings.challenge)?.detail}
+              </p>
               <label className="field-label">05 / SCORED REPS</label>
               <div className="choice-row">
                 {[4, 6, 8].map((goal) => (
@@ -1043,7 +1057,7 @@ export default function CoachFlow({
           <div className="eyebrow">
             {summary.record.demo ? "DEMO SESSION · " : ""}QUALITY REPORT
           </div>
-          <h2>Session results</h2>
+          <h2>Session Results</h2>
           <p className="result-subtitle">{summary.reason}</p>
           <div className="final-scores">
             {summary.record.names.map((name, index) => (
@@ -1062,7 +1076,6 @@ export default function CoachFlow({
             ))}
           </div>
           <div className="recap panel">
-            <p>{cue}</p>
             <p>
               Average {averages[summary.winner ?? 0] ?? "unscored"}. Scored reps{" "}
               {summary.record.reps[summary.winner ?? 0] || 0}. Consistency{" "}
@@ -1073,7 +1086,6 @@ export default function CoachFlow({
             </p>
             {summary.strongest && <p>Strongest measure: {summary.strongest}.</p>}
             {summary.suggestion && <p>Next time: {summary.suggestion}</p>}
-            <p className="disclaimer">These quality estimates are experimental, not a clinical grade.</p>
             {summary.best.improved && (
               <p>Personal best. This beat your previous comparable session.</p>
             )}
@@ -1093,10 +1105,6 @@ export default function CoachFlow({
               ))}
             </div>
           </div>
-          <p className="disclaimer">
-            Scores are approximate, camera-dependent, and not a clinical
-            assessment. A larger movement is not automatically a better one.
-          </p>
           <LeaderboardSubmit
             demo={summary.record.demo}
             experience="coach"
@@ -1129,7 +1137,7 @@ export default function CoachFlow({
             <button className="secondary" onClick={() => setStep("progress")}>
               Progress
             </button>
-            <a className="text-button" href="/leaderboard">
+            <a className="secondary" href="/leaderboard">
               Championship board
             </a>
           </div>
