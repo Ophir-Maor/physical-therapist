@@ -30,6 +30,11 @@ test("guided demo scores control and keeps arcade available", async ({ page }) =
     timeout: 30000,
   });
   await expect(page.locator(".final-scores b").first()).not.toHaveText("—");
+  const repTable = page.getByRole("table", { name: /Alex · score per rep/ });
+  await expect(repTable).toBeVisible();
+  await expect(repTable.getByRole("columnheader", { name: "Score" })).toBeVisible();
+  const scores = await repTable.getByRole("cell").allTextContents();
+  expect(scores.some((score) => /^\d+$/.test(score.trim()))).toBe(true);
   await page.getByRole("button", { name: "Everyday League home" }).click();
   await page.getByRole("button", { name: "Arcade Championship" }).click();
   await expect(page.getByRole("button", { name: "Enter Demo Arena" })).toBeVisible();

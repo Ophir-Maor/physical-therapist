@@ -328,36 +328,6 @@ em {
   color: var(--lime);
   font-size: 24px;
 }
-.features {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  padding: 48px 5%;
-  gap: 45px;
-  max-width: 1500px;
-  margin: auto;
-}
-.features article > svg {
-  color: var(--lime);
-  margin-bottom: 22px;
-  width: 25px;
-}
-.features article > span {
-  display: block;
-  font: 10px monospace;
-  letter-spacing: 1px;
-  color: var(--muted);
-}
-.features h3 {
-  font-size: 21px;
-  letter-spacing: -0.6px;
-  margin: 13px 0;
-}
-.features p {
-  font-size: 13px;
-  line-height: 1.7;
-  color: var(--muted);
-  max-width: 300px;
-}
 footer {
   border-top: 1px solid var(--line);
   display: flex;
@@ -392,6 +362,16 @@ footer b {
   border: 0;
   font-size: 12px;
   padding: 10px 0;
+}
+.setup-nav {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.setup-nav > .text-button + .text-button {
+  margin-left: 22px;
+  padding-left: 22px;
+  border-left: 1px solid var(--line);
 }
 .setup-wrap > .eyebrow {
   margin-top: 30px;
@@ -984,6 +964,51 @@ select {
   letter-spacing: 1px;
   color: var(--muted);
 }
+.rep-tables {
+  display: grid;
+  gap: 16px;
+  width: min(420px, 100%);
+  margin: 0 auto 28px;
+  text-align: left;
+}
+.rep-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #141816;
+  border: 1px solid var(--line);
+}
+.rep-table caption {
+  padding: 14px 16px 8px;
+  text-align: left;
+  font-weight: 700;
+}
+.rep-table th,
+.rep-table td {
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+}
+.rep-table thead th {
+  color: var(--muted);
+  font: 11px monospace;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.rep-table tbody th {
+  font-weight: 600;
+  text-align: left;
+}
+.rep-table td {
+  text-align: right;
+  font-size: 18px;
+  font-weight: 700;
+}
+.rep-table td[colspan] {
+  text-align: left;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--muted);
+}
 .recap {
   padding: 25px;
   max-width: 600px;
@@ -1187,18 +1212,6 @@ select {
   }
   .eyebrow {
     font-size: 9px;
-  }
-  .features {
-    grid-template-columns: 1fr;
-    gap: 25px;
-    padding: 35px 22px;
-  }
-  .features article {
-    border-bottom: 1px solid var(--line);
-    padding-bottom: 15px;
-  }
-  .features article > svg {
-    margin-bottom: 12px;
   }
   .ticker {
     justify-content: flex-start;

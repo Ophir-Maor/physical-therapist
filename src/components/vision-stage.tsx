@@ -23,7 +23,48 @@ type Props = {
   demoPlaying?: boolean;
   overlay?: () => (Landmark[] | null)[] | null;
   showPoseOverlay?: boolean;
+  /** Which scripted athlete to show when only one person is on screen. */
+  demoPlayer?: number;
 };
+
+/**
+ * Use the camera's widest view when it can zoom or crop. This does not invent
+ * a fisheye lens: pixels outside the sensor stay outside the frame.
+ */
+type WideCameraCapabilities = MediaTrackCapabilities & {
+  resizeMode?: string[];
+  zoom?: { min?: number; max?: number };
+};
+
+async function widenCameraView(track: MediaStreamTrack) {
+  const capabilities = track.getCapabilities?.() as
+    | WideCameraCapabilities
+    | undefined;
+  if (!capabilities) return false;
+  let widened = false;
+  if (capabilities.resizeMode?.includes("none")) {
+    try {
+      await track.applyConstraints({
+        resizeMode: "none",
+      } as MediaTrackConstraints);
+      widened = true;
+    } catch {
+      /* Keep the browser's default crop when the camera rejects it. */
+    }
+  }
+  const widest = capabilities.zoom?.min;
+  if (typeof widest === "number" && Number.isFinite(widest)) {
+    try {
+      await track.applyConstraints({
+        advanced: [{ zoom: widest } as MediaTrackConstraintSet],
+      });
+      widened = true;
+    } catch {
+      /* A camera with no zoom range stays at its native field of view. */
+    }
+  }
+  return widened;
+}
 
 const CONNECTIONS = [
   [11, 12],
@@ -132,6 +173,7 @@ function VisionStage({
   demoPlaying = false,
   overlay,
   showPoseOverlay = true,
+  demoPlayer = 0,
 }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -145,6 +187,7 @@ function VisionStage({
     demoPlaying,
     overlay,
     showPoseOverlay,
+    demoPlayer,
   });
   useEffect(() => {
     live.current = {
@@ -157,6 +200,7 @@ function VisionStage({
       demoPlaying,
       overlay,
       showPoseOverlay,
+      demoPlayer,
     };
   }, [
     onPoses,
@@ -168,6 +212,7 @@ function VisionStage({
     demoPlaying,
     overlay,
     showPoseOverlay,
+    demoPlayer,
   ]);
 
   useEffect(() => {
@@ -224,12 +269,16 @@ function VisionStage({
         const exerciseId =
           live.current.exercise === "squats" ? "squats" : "arm-raises";
         const poses = coach
-          ? Array.from(
-              { length: players },
-              (_, i) => demoFrame(exerciseId, coachElapsed, i).pose,
+          ? Array.from({ length: players }, (_, i) =>
+              demoFrame(
+                exerciseId,
+                coachElapsed,
+                live.current.demoPlayer ?? i,
+              ).pose,
             )
           : Array.from({ length: players }, (_, i) => {
-              const period = i === 0 ? 2000 : 2700;
+              const athlete = live.current.demoPlayer ?? i;
+              const period = athlete === 0 ? 2000 : 2700;
               const phase = ((time - demoStart) % period) / period;
               const slot = players === 1 ? 0 : i + 1;
               const moving =
@@ -336,6 +385,12 @@ function VisionStage({
             frameRate: { ideal: 24, max: 30 },
           },
         });
+        if (disposed) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        const videoTrack = stream.getVideoTracks()[0];
+        if (videoTrack) await widenCameraView(videoTrack);
         if (disposed) {
           stream.getTracks().forEach((track) => track.stop());
           return;

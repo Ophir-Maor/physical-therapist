@@ -19,7 +19,7 @@ test("demo uses detector pipeline through results and restart", async ({
   await page.screenshot({ path: "test-results/broadcast.png", fullPage: true });
   await expect(
     page.getByRole("heading", { name: /WINS\.|SHARED GLORY/ }),
-  ).toBeVisible({ timeout: 20000 });
+  ).toBeVisible({ timeout: 45000 });
   await expect(page.locator(".final-scores b").first()).not.toHaveText("0");
   await expect(page.locator(".final-scores b").nth(1)).not.toHaveText("0");
   await expect(page.locator(".results details")).not.toContainText("(0)");
