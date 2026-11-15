@@ -12,18 +12,6 @@ export type Activity = {
 
 export const ACTIVITIES: Activity[] = [
   {
-    exercise: "jumping-jacks",
-    experience: "arcade",
-    label: "Jumping jacks",
-    challenges: ["reps"],
-  },
-  {
-    exercise: "arm-raises",
-    experience: "arcade",
-    label: "Arm raises",
-    challenges: ["reps"],
-  },
-  {
     exercise: "arm-raises",
     experience: "coach",
     label: "Controlled arm raises",

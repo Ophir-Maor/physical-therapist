@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowRight, ChevronLeft, Pause, Play } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronLeft, ChevronUp, Pause, Play } from "lucide-react";
 import ExerciseDemo from "@/components/exercise-demo";
 import LeaderboardSubmit from "@/components/leaderboard-submit";
 import PoseAvatar from "@/components/pose-avatar";
@@ -105,12 +105,10 @@ const avatarCanTrack = (pose: Landmark[] | null, exercise: ExerciseId) => {
 
 export default function CoachFlow({
   onExit,
-  onArcade,
   initialStep = "setup",
   initialPersonality = "supportive",
 }: {
   onExit: () => void;
-  onArcade: () => void;
   initialStep?: "setup" | "progress";
   initialPersonality?: CoachId;
 }) {
@@ -740,24 +738,31 @@ export default function CoachFlow({
               )}
             </div>
             <div className="panel settings">
-              <label className="field-label">03 / COACH</label>
-              <div className="choice-row">
-                {COACHES.map((coach) => (
-                  <button
-                    key={coach.id}
-                    className={`choice ${settings.personality === coach.id ? "selected" : ""}`}
-                    onClick={() =>
-                      setSettings({ ...settings, personality: coach.id })
-                    }
-                  >
-                    <strong>{coach.name}</strong>
-                    <small>{coach.detail}</small>
-                  </button>
-                ))}
-              </div>
+              <label className="field-label">
+                03 / COACH
+                <select
+                  aria-label="Coach"
+                  value={settings.personality}
+                  onChange={(event) =>
+                    setSettings({
+                      ...settings,
+                      personality: event.target.value as CoachId,
+                    })
+                  }
+                >
+                  {COACHES.map((coach) => (
+                    <option key={coach.id} value={coach.id}>
+                      {coach.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="dropdown-detail">
+                {COACHES.find((coach) => coach.id === settings.personality)?.detail}
+              </p>
               <button
                 type="button"
-                className="secondary"
+                className="secondary coach-preview"
                 onClick={() => {
                   voice.current?.unlock();
                   voice.current!.personality = settings.personality;
@@ -772,32 +777,77 @@ export default function CoachFlow({
               >
                 Hear {COACHES.find((coach) => coach.id === settings.personality)?.voiceName}&apos;s intro
               </button>
-              <label className="field-label">04 / CHALLENGE</label>
-              <div className="choice-row">
-                {CHALLENGES.map((challenge) => (
-                  <button
-                    key={challenge.id}
-                    className={`choice ${settings.challenge === challenge.id ? "selected" : ""}`}
-                    onClick={() =>
-                      setSettings({ ...settings, challenge: challenge.id })
-                    }
-                  >
-                    <strong>{challenge.name}</strong>
-                    <small>{challenge.detail}</small>
-                  </button>
-                ))}
-              </div>
+              <label className="field-label">
+                04 / CHALLENGE
+                <select
+                  aria-label="Challenge"
+                  value={settings.challenge}
+                  onChange={(event) =>
+                    setSettings({
+                      ...settings,
+                      challenge: event.target.value as ChallengeId,
+                    })
+                  }
+                >
+                  {CHALLENGES.map((challenge) => (
+                    <option key={challenge.id} value={challenge.id}>
+                      {challenge.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="dropdown-detail">
+                {CHALLENGES.find((challenge) => challenge.id === settings.challenge)?.detail}
+              </p>
               <label className="field-label">05 / SCORED REPS</label>
-              <div className="choice-row">
-                {[4, 6, 8].map((goal) => (
-                  <button
-                    key={goal}
-                    className={`choice ${settings.goal === goal ? "selected" : ""}`}
-                    onClick={() => setSettings({ ...settings, goal })}
-                  >
-                    <strong>{goal} quality reps</strong>
-                  </button>
-                ))}
+              <div className="rep-stepper">
+                <div className="rep-stepper-box">
+                  <input
+                    aria-label="Scored reps"
+                    type="number"
+                    min={1}
+                    max={99}
+                    inputMode="numeric"
+                    value={settings.goal}
+                    onChange={(event) => {
+                      const next = Number(event.target.value);
+                      if (!Number.isInteger(next)) return;
+                      setSettings({
+                        ...settings,
+                        goal: Math.min(99, Math.max(1, next)),
+                      });
+                    }}
+                  />
+                  <div className="rep-stepper-arrows">
+                    <button
+                      type="button"
+                      aria-label="Increase scored reps"
+                      disabled={settings.goal >= 99}
+                      onClick={() =>
+                        setSettings({
+                          ...settings,
+                          goal: Math.min(99, settings.goal + 1),
+                        })
+                      }
+                    >
+                      <ChevronUp size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Decrease scored reps"
+                      disabled={settings.goal <= 1}
+                      onClick={() =>
+                        setSettings({
+                          ...settings,
+                          goal: Math.max(1, settings.goal - 1),
+                        })
+                      }
+                    >
+                      <ChevronDown size={14} />
+                    </button>
+                  </div>
+                </div>
+                <span>quality reps</span>
               </div>
               <p className="disclaimer">
                 Experimental movement coaching, not a medical device. It does
@@ -807,9 +857,6 @@ export default function CoachFlow({
               <div className="coach-actions">
                 <button className="primary" onClick={enterDemoStep}>
                   Continue to demonstration <ArrowRight size={18} />
-                </button>
-                <button className="secondary" onClick={onArcade}>
-                  Switch to arcade
                 </button>
               </div>
             </div>
@@ -1247,7 +1294,7 @@ export default function CoachFlow({
             <button className="secondary" onClick={() => setStep("progress")}>
               Progress
             </button>
-            <a className="text-button" href="/leaderboard">
+            <a className="secondary" href="/leaderboard">
               Championship board
             </a>
           </div>

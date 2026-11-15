@@ -22,17 +22,20 @@ npm run dev
 Open http://localhost:3000. `http://127.0.0.1:3000` is also allowed in dev (`allowedDevOrigins`). Using the other host used to load the page with no JavaScript, so buttons did nothing. Hard-refresh after a dev-server restart.
 
 - **Start Training** opens Guided Coach: demonstration, calibration, form scoring, and one of four coaches.
-- **Arcade Championship** is a first-to-5, 10, or 15 rep-count broadcast as a secondary mode.
-- **Quality board** opens `/leaderboard`, ranked by average form quality.
+- Playable exercises are controlled arm raises and controlled squats. Jumping jacks and the arcade arm-raise race are no longer offered, and those boards are not selectable.
+- **Quality board** opens `/leaderboard`, ranked by average form quality for the two controlled exercises.
 - Demo Mode needs neither a camera nor API keys. Live webcam is requested only after the user chooses it and continues.
+- The landing page’s right-hand “GO BIG” illustration is replaced by the live championship board for the selected exercise and challenge. It uses the same `/api/leaderboard` top 10, and **Open full board** keeps that category.
+- Guided Coach setup uses dropdowns for coach and challenge. Exercise and player count stay as buttons. Scored reps are a 1–99 number box with up and down controls and the words “quality reps” beside it. The default is 4. The selected coach and challenge each keep one line of detail. The Hear intro button sits 28px above the challenge title. Dropdowns do not keep the lime focus outline after a choice is clicked.
+- The merge of `origin` into `Sean` kept the teammate Session Results layout in `src/components/coach-flow.tsx`. Two players get a win, even-set, or stopped heading plus a score-per-rep table. A solo session keeps “Session results”, the quality report, the coaching cue, and the recap. Championship board still uses the outlined Progress button style and opens `/leaderboard`.
 
-Real voice is configured in gitignored `.env.local` (`ELEVENLABS_API_KEY` plus one voice ID per personality). Restart Next.js after any env change. The key is not in client code, docs, or git. Missing credentials or an upstream failure use labeled browser speech and captions. Camera frames never leave the browser. Only the commentary sentence and personality name are sent to ElevenLabs.
+Real voice is configured in gitignored `.env.local` (`ELEVENLABS_API_KEY`; voice IDs stay on the built-in Sarah, Callum, Charlie, and River presets unless overridden). Restart Next.js after any env change. On November 14, after adding the key and restarting, short speech requests for supportive, drill, hype, and calm each returned HTTP 200 `audio/mpeg`. Playback through the speakers was not checked. The key is not in client code, docs, or git. Missing credentials or an upstream failure use labeled browser speech and captions. Camera frames never leave the browser. Only the commentary sentence and personality name are sent to ElevenLabs.
 
 Shared board: quality rankings are the primary board. A coach row ranks by the average quality across all scored repetitions, then consistency, then earlier submission. It must match only the exercise, challenge, and scoring version `form-v1`. Calibrated range, selected repetition goal, and completed repetition count are stored as context but do not select a board or affect rank. `db/migrations/002_scoring_version.sql` adds nullable `scoring_version`. Older rows with a null version stay in the table and are not mixed into that board. Arcade boards rank counted reps without duration categories. Demo Mode cannot be posted.
 
 ## What changed on November 14
 
-The arcade path is still the landing headline, `GameEngine`, `ActivityDetector`, `PlayerTracker`, and the original three Playwright journeys in `tests/broadcast.spec.ts`.
+Jumping jacks and arcade arm raises are removed from the landing page, coach setup, and championship filters. The public boards are controlled arm raises and controlled squats, each with Form and Consistency. Older arcade rows can remain in the database, but the app no longer lists or accepts them. On November 14, 20 sample rows were added to each of those four boards, with mixed high, middle, and low quality scores and separate nicknames. The existing controlled-arm-raise consistency row remains, so that board has 21 rows. The page still shows only the top 10.
 
 ### Optional coach introductions
 
@@ -85,14 +88,12 @@ Live two-player arcade matches use this registration before **Start match**. Dem
 
 `GET /api/leaderboard` returns at most 10 rows for one comparable category. Both coached challenge boards rank average quality, then consistency, then earlier `created_at`, and only include rows tagged `form-v1`. Arcade ranks counted reps on one board per exercise, with no duration filter. Coach boards require only the same exercise and challenge; repetition goal, completed rep count, and calibrated target are not board filters.
 
-The page at `/leaderboard` is linked from the landing header, arcade setup, arcade results, and Guided Coach setup and results. It polls periodically while the tab is visible, and **Refresh** loads immediately. Changing exercise or challenge updates that category only.
+The page at `/leaderboard` is linked from the home-page board, arcade setup, arcade results, and Guided Coach setup and results. The top-right header link is removed. It polls periodically while the tab is visible, and **Refresh** loads immediately. Changing exercise or challenge updates that category only.
 
 ### Championship categories
 
 | Exercise | Challenge | Grouping | Rank |
 | --- | --- | --- | --- |
-| Jumping jacks | Arcade Championship | All submitted live rep-goal sets | Reps |
-| Arm raises | Arcade Championship | All submitted live rep-goal sets | Reps |
 | Controlled arm raises | Form | All submitted live sets | Average quality |
 | Controlled arm raises | Consistency | All submitted live sets | Average quality |
 | Controlled squats | Form | All submitted live sets | Average quality |
@@ -107,7 +108,7 @@ cd '/Users/alinamaor/Documents/SanD Hacks/everyday-league'
 npm run dev
 ```
 
-Open http://127.0.0.1:3000/leaderboard. The page opens on controlled arm raises and Form. Switch the exercise to arcade **Arm raises** to view its rep-count board. Legacy duration-based rows are intentionally not mixed into the new board. Other categories stay empty until a live, non-demo session is submitted.
+Open http://127.0.0.1:3000/leaderboard. The page opens on controlled arm raises and Form. The exercise list is controlled arm raises and controlled squats. Other categories stay empty until a live, non-demo session is submitted.
 
 ## Coaching session context
 
