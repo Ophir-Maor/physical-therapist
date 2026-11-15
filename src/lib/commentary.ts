@@ -1,4 +1,5 @@
 import type { GameEvent } from "./engine";
+import { renderFixed, renderRecap, type CoachPersonality, type SessionContext } from "./session-context";
 
 export type Personality =
   | "hype"
@@ -74,63 +75,36 @@ export function commentaryFor(
   return lines[event.type]?.[column[personality]] ?? null;
 }
 
-export type CoachPersonality = "supportive" | "drill" | "hype" | "calm";
+export type { CoachPersonality } from "./session-context";
 export function coachCommentary(input: {
-  type: "intro" | "rep" | "visibility" | "done" | "stop";
+  type: "intro" | "rep" | "visibility" | "done" | "stop" | "preview";
   personality: CoachPersonality;
   name: string;
   quality?: number | null;
   feedback?: string;
   average?: number | null;
+  consistency?: "steady" | "uneven";
+  trend?: "improved";
 }) {
-  const feedback = input.feedback || "Move only through a comfortable range.";
-  const quality =
-    input.quality == null ? "unscored" : String(Math.round(input.quality));
-  const average =
-    input.average == null ? "an unscored set" : `${Math.round(input.average)}`;
-  const lines: Record<CoachPersonality, Record<typeof input.type, string>> = {
-    supportive: {
-      intro: `${input.name}, we'll score control and your selected target. Stop if anything feels painful.`,
-      rep:
-        quality === "unscored"
-          ? `${input.name}, I won't score that one. ${feedback}`
-          : `${input.name}, that was a ${quality}. ${feedback}`,
-      visibility: `${input.name}, ${feedback}`,
-      done: `${input.name}, session complete with ${average}. Quality counted more than speed. This is not a medical assessment.`,
-      stop: `${input.name}, session stopped. Stopping is the right call whenever you want, especially if something hurts.`,
-    },
-    drill: {
-      intro: `${input.name}! WE WANT CONTROL, NOT CHAOS. STOP IMMEDIATELY IF YOU FEEL PAIN.`,
-      rep:
-        quality === "unscored"
-          ? `NO SCORE. I COULD NOT SEE IT. ${feedback.toUpperCase()}`
-          : `THAT WAS A ${quality}. ${feedback.toUpperCase()}`,
-      visibility: `HOLD UP. ${feedback.toUpperCase()}`,
-      done: `SET COMPLETE. AVERAGE ${average}. WE DO NOT CHASE PAIN, AND THIS IS NOT A CLINICAL GRADE.`,
-      stop: `SESSION STOPPED. GOOD. NEVER TRAIN THROUGH PAIN FOR THIS APP.`,
-    },
-    hype: {
-      intro: `${input.name} steps up! The judges are scoring control, not chaos. Stop if you feel pain.`,
-      rep:
-        quality === "unscored"
-          ? `NO SCORE ON THE BOARD. ${feedback}`
-          : `A ${quality} FROM THE JUDGES! ${feedback}`,
-      visibility: `THE CAMERA LOST THE ANGLE. ${feedback}`,
-      done: `THE SET IS IN THE BOOKS AT ${average}! Smoothness gets the highlight. Not a medical verdict.`,
-      stop: `THE SESSION ENDS ON REQUEST. A smart stop is still a championship decision.`,
-    },
-    calm: {
-      intro: `${input.name}: raise or lower to your selected target, then return slowly. Stop if you feel pain.`,
-      rep:
-        quality === "unscored"
-          ? `Not scored. ${feedback}`
-          : `${feedback} Score ${quality}.`,
-      visibility: feedback,
-      done: `Session complete. Average ${average}. This score is experimental, not a clinical measure.`,
-      stop: `Session stopped. You can end a set at any time.`,
-    },
-  };
-  return lines[input.personality][input.type];
+  if (input.type === "intro" || input.type === "preview" || input.type === "stop")
+    return renderFixed(input.personality, input.type, input.name);
+  if (input.type === "visibility") return `${input.name}, ${input.feedback || "Step back so the camera can see the movement."}`;
+  if (input.type === "done") {
+    const context = {
+      name: input.name,
+      repNumber: 0,
+      average: input.average ?? null,
+      improvement: null,
+      suggestion: null,
+      strongestLabel: null,
+    } as SessionContext;
+    return renderRecap(context).replace(" 0 scored reps, ", " the set, ");
+  }
+  const fact = input.feedback || "Move only through a comfortable range.";
+  if (input.quality == null) return input.personality === "calm" ? `Not scored. ${fact}` : `${input.name}, I'll leave that one unscored. ${fact}`;
+  if (input.trend === "improved") return `That's smoother, ${input.name}. ${input.quality}. ${fact}`;
+  if (input.consistency === "steady") return `${input.name}, score ${input.quality}. Your last reps are lining up. ${fact}`;
+  return `${input.name}, ${input.quality}. ${fact}`;
 }
 
 interface Line {
@@ -203,6 +177,13 @@ export class BroadcastVoice {
       })
       .catch(() => {});
     window.speechSynthesis?.resume();
+  }
+  /** Plays one sample for the current personality. Repeats use the audio cache. */
+  preview(text: string) {
+    this.stop();
+    this.lastStarted = -Infinity;
+    this.queue.push(text, 7, `preview-${Date.now()}`);
+    void this.pump();
   }
   enqueue(text: string, priority = 1, key = text) {
     if (this.isMuted) {
@@ -322,11 +303,11 @@ export class BroadcastVoice {
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate =
         this.personality === "hype"
-          ? 1.12
+          ? 1.16
           : this.personality === "drill"
-            ? 1.04
+            ? 0.94
             : this.personality === "calm"
-              ? 0.96
+              ? 0.86
               : 1;
       const timeout = setTimeout(() => {
         window.speechSynthesis.cancel();

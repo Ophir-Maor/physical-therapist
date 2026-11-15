@@ -932,6 +932,91 @@ select {
   display: flex;
   gap: 15px;
   justify-content: center;
+  flex-wrap: wrap;
+}
+.board-panel {
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+  margin: 8px auto 22px;
+  max-width: 680px;
+}
+.board-form {
+  width: min(100%, 560px);
+  text-align: left;
+  padding: 22px;
+}
+.board-form h3 {
+  margin: 0 0 12px;
+  font-size: 22px;
+}
+.board-form dl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 16px;
+  margin: 14px 0;
+}
+.board-form dt {
+  font: 10px monospace;
+  letter-spacing: 1px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.board-form dd {
+  margin: 2px 0 0;
+  font-weight: 700;
+}
+.consent {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 12px 0 16px;
+}
+.board-note {
+  color: var(--lime);
+  font-size: 14px;
+}
+.board-table {
+  width: min(100%, 680px);
+  text-align: left;
+  padding: 18px 20px 8px;
+}
+.board-table ol {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+.board-table li {
+  display: grid;
+  grid-template-columns: 42px 1fr auto;
+  gap: 2px 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.board-table li.mine {
+  background: rgba(198, 242, 78, 0.06);
+}
+.board-table li b {
+  grid-row: span 2;
+  color: var(--lime);
+}
+.board-table li span:nth-of-type(2) {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 12px;
+}
+.board-table li strong {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  align-self: center;
+  font-size: 22px;
+}
+.board-table small {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 11px;
 }
 .secondary {
   background: transparent;
@@ -1372,5 +1457,129 @@ select {
   *:after {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+.championship {
+  min-height: 100vh;
+}
+.champ-wrap {
+  width: min(980px, calc(100% - 32px));
+  margin: 28px auto 64px;
+}
+.champ-wrap h1 {
+  font-size: clamp(42px, 7vw, 84px);
+  letter-spacing: -2px;
+  line-height: 0.9;
+}
+.champ-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  align-items: end;
+  margin: 22px 0 8px;
+}
+.champ-filters label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font: 11px monospace;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.champ-filters select,
+.champ-filters button {
+  min-height: 46px;
+}
+.champ-unit {
+  color: var(--lime);
+  font: 13px monospace;
+  letter-spacing: 0.4px;
+}
+.champ-list {
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  margin: 18px 0;
+  padding: 0;
+}
+.champ-list li {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  grid-template-areas: "rank name score" "rank date score";
+  gap: 2px 14px;
+  align-items: center;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  background: #121816;
+  animation: rise 420ms ease both;
+}
+.champ-list b {
+  grid-area: rank;
+  font-size: 22px;
+}
+.champ-list span {
+  grid-area: name;
+  font-size: 22px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.champ-list strong {
+  grid-area: score;
+  text-align: right;
+  font-size: 28px;
+  color: var(--lime);
+}
+.champ-list strong small,
+.champ-list time {
+  display: block;
+  color: var(--muted);
+  font: 11px monospace;
+}
+.champ-list time {
+  grid-area: date;
+}
+.champ-list .place-1 {
+  border-color: var(--lime);
+  background: linear-gradient(90deg, #1c2a08, #121816 55%);
+}
+.champ-list .place-2 {
+  border-color: #d7dde4;
+}
+.champ-list .place-3 {
+  border-color: #c9843a;
+}
+.champ-list .yours {
+  outline: 2px solid var(--lime);
+}
+.champ-empty {
+  margin-top: 18px;
+}
+.champ-link {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 10px;
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (max-width: 700px) {
+  .champ-list li {
+    grid-template-columns: 58px minmax(0, 1fr);
+    grid-template-areas: "rank name" "rank score" "rank date";
+  }
+  .champ-list strong {
+    text-align: left;
+    font-size: 22px;
+  }
+  .header-right .text-button {
+    font-size: 10px;
   }
 }

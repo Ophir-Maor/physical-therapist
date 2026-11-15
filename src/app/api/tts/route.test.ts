@@ -6,6 +6,7 @@ vi.mock("@elevenlabs/elevenlabs-js", () => ({
   },
 }));
 import { POST } from "./route";
+import { COACH_VOICES } from "../../../lib/voices";
 const request = (body: unknown) =>
   new Request("http://localhost:3000/api/tts", {
     method: "POST",
@@ -74,10 +75,20 @@ describe("speech API", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("audio/mpeg");
     expect(convert).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({ text: "Hello", modelId: "eleven_flash_v2_5" }),
+      COACH_VOICES.hype.id,
+      expect.objectContaining({
+        text: "Hello",
+        modelId: "eleven_flash_v2_5",
+        voiceSettings: {
+          stability: COACH_VOICES.hype.stability,
+          similarityBoost: COACH_VOICES.hype.similarityBoost,
+          speed: COACH_VOICES.hype.speed,
+          useSpeakerBoost: true,
+        },
+      }),
       expect.objectContaining({ maxRetries: 0 }),
     );
+    expect(convert.mock.calls[0][1].voiceSettings.style).toBeUndefined();
   });
   it("handles upstream failures without exposing secrets", async () => {
     vi.stubEnv("ELEVENLABS_API_KEY", "test-secret");

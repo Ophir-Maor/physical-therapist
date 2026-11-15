@@ -1,5 +1,7 @@
 import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 import { z } from "zod";
+import { allowsSameSite } from "../../../lib/same-origin";
+import { COACH_VOICES, type VoicePersonality } from "../../../lib/voices";
 
 export const runtime = "nodejs";
 const schema = z
@@ -10,12 +12,12 @@ const schema = z
       .default("hype"),
   })
   .strict();
+
 // Local demo protection, not a distributed production rate limiter.
 let windowStart = 0;
 let requests = 0;
 export async function POST(request: Request) {
-  const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin)
+  if (!allowsSameSite(request))
     return Response.json(
       { error: "Cross-origin speech requests are not allowed." },
       { status: 403 },
@@ -56,10 +58,10 @@ export async function POST(request: Request) {
       { error: "Commentary rate limit reached.", fallback: true },
       { status: 429, headers: { "Retry-After": "60" } },
     );
+  const preset = COACH_VOICES[data.personality as VoicePersonality];
   const voiceId =
     process.env[`ELEVENLABS_VOICE_${data.personality.toUpperCase()}`] ||
-    process.env.ELEVENLABS_VOICE_ID ||
-    "JBFqnCBsd6RMkjVDRZzb";
+    preset.id;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   try {
@@ -69,7 +71,13 @@ export async function POST(request: Request) {
       {
         text: data.text,
         modelId: process.env.ELEVENLABS_MODEL_ID || "eleven_flash_v2_5",
-        outputFormat: "mp3_44100_128",
+        outputFormat: "mp3_44100_64",
+        voiceSettings: {
+          stability: preset.stability,
+          similarityBoost: preset.similarityBoost,
+          speed: preset.speed,
+          useSpeakerBoost: true,
+        },
       },
       { abortSignal: controller.signal, maxRetries: 0, timeoutInSeconds: 8 },
     );

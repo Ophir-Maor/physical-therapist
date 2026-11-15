@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight, ChevronLeft, Pause, Play } from "lucide-react";
 import ExerciseDemo from "@/components/exercise-demo";
+import LeaderboardSubmit from "@/components/leaderboard-submit";
 import VisionStage from "@/components/vision-stage";
 import { BroadcastVoice, coachCommentary } from "@/lib/commentary";
+import { requestCoachLine } from "@/lib/coach-client";
 import { ghostFrame } from "@/lib/demo-motion";
 import { PlayerTracker, type Landmark } from "@/lib/engine";
 import {
@@ -26,6 +28,17 @@ import {
   type RepEvaluation,
 } from "@/lib/form";
 import { IdentityRegistrar } from "@/lib/identity";
+import {
+  applyRep,
+  applyTracking,
+  completeSession,
+  createSession,
+  decide,
+  isStale,
+  renderFixed,
+  renderLine,
+  type SessionContext,
+} from "@/lib/session-context";
 import {
   achievementsFor,
   loadSessions,
@@ -70,14 +83,19 @@ export default function CoachFlow({
   onExit,
   onArcade,
   initialStep = "setup",
+  initialPersonality = "supportive",
 }: {
   onExit: () => void;
   onArcade: () => void;
   initialStep?: "setup" | "progress";
+  initialPersonality?: CoachId;
 }) {
   const [step, setStep] = useState<Step>(initialStep);
   const [arena, setArena] = useState<Arena>("register");
-  const [settings, setSettings] = useState<Settings>(initial);
+  const [settings, setSettings] = useState<Settings>({
+    ...initial,
+    personality: initialPersonality,
+  });
   const [ready, setReady] = useState(false);
   const [status, setStatus] = useState("Step into the frame.");
   const [reg, setReg] = useState({
@@ -102,9 +120,12 @@ export default function CoachFlow({
     best: ReturnType<typeof personalBest>;
     reason: string;
     winner: number | null;
+    consistencies: Array<number | null>;
+    suggestion: string | null;
+    strongest: string | null;
+    improvement: number | null;
   } | null>(null);
   const [history, setHistory] = useState<SessionRecord[]>(() => loadSessions());
-  const [boardNote, setBoardNote] = useState("");
   const settingsRef = useRef(settings);
   const arenaRef = useRef(arena);
   const voice = useRef<BroadcastVoice | null>(null);
@@ -113,6 +134,7 @@ export default function CoachFlow({
   const tracker = useRef<PlayerTracker | null>(null);
   const registrar = useRef<IdentityRegistrar | null>(null);
   const reps = useRef<RepEvaluation[][]>([[], []]);
+  const sessions = useRef<SessionContext[]>([createSession({}), createSession({})]);
   const targetsRef = useRef<(number | null)[]>([null, null]);
   const started = useRef(0);
   const pausedMs = useRef(0);
@@ -155,9 +177,17 @@ export default function CoachFlow({
         started.current = Date.now();
         pausedMs.current = 0;
         finished.current = false;
+        const current = settingsRef.current;
+        sessions.current = [0, 1].map((index) =>
+          createSession({
+            exercise: current.exercise,
+            personality: current.personality,
+            name: current.names[index] || current.names[0],
+            goal: current.goal,
+          }),
+        );
         arenaRef.current = "active";
         setArena("active");
-        const current = settingsRef.current;
         voice.current?.enqueue(
           coachCommentary({
             type: "intro",
@@ -214,23 +244,30 @@ export default function CoachFlow({
     const prior = loadSessions();
     saveSession(record);
     setHistory(loadSessions());
+    const player = decision.index ?? 0;
+    const report = completeSession(sessions.current[player] ?? createSession({
+      name: current.names[player] || current.names[0],
+      personality: current.personality,
+      exercise: current.exercise,
+      goal: current.goal,
+    }));
+    const recap = renderLine(report, decide(report));
     setSummary({
       record,
       badges: achievementsFor(prior, record),
       best: personalBest(prior, record),
       reason: decision.reason,
       winner: decision.index,
+      consistencies: summaries.map((item) => item.consistency),
+      suggestion: report.suggestion,
+      strongest: report.strongestLabel,
+      improvement: report.improvement,
     });
     setAverages(summaries.map((item) => item.average));
     voice.current?.enqueue(
-      coachCommentary({
-        type: reason === "stop" ? "stop" : "done",
-        personality: current.personality,
-        name: current.names[decision.index ?? 0] || current.names[0],
-        average: summaries[decision.index ?? 0]?.average ?? primary.average,
-      }),
+      reason === "stop" ? renderFixed(current.personality, "stop", report.name) : recap,
       10,
-      `coach-${reason}`,
+      reason === "stop" ? "coach-stop" : "coach-recap",
     );
     arenaRef.current = "paused";
     setArena("paused");
@@ -298,23 +335,43 @@ export default function CoachFlow({
           );
           setCue(result.rep.feedback);
           setMetrics(result.rep.metrics);
-          const speak =
-            !result.rep.scored ||
-            (result.rep.quality ?? 0) >= 88 ||
-            (result.rep.quality ?? 100) < 75 ||
-            scored[index] % 2 === 0;
-          if (speak)
-            voice.current?.enqueue(
-              coachCommentary({
-                type: "rep",
-                personality: current.personality,
-                name: current.names[index],
-                quality: result.rep.quality,
-                feedback: result.rep.feedback,
-              }),
-              result.rep.scored ? 3 : 4,
-              `rep-${index}-${reps.current[index].length}`,
-            );
+          const measured = {
+            scored: result.rep.scored,
+            quality: result.rep.quality,
+            confidence: result.rep.confidence,
+            rushed: result.rep.rushed,
+            feedback: result.rep.feedback,
+            metrics: result.rep.metrics.map((metric) => ({
+              id: metric.id,
+              label: metric.label,
+              score: metric.score,
+              note: metric.note,
+            })),
+          };
+          let context = applyRep(sessions.current[index], measured);
+          const decision = decide(context, measured);
+          if (decision.speak) {
+            const line = renderLine(context, decision);
+            context = {
+              ...context,
+              spokenKeys: [...context.spokenKeys, decision.key].slice(-12),
+              recentComments: [...context.recentComments, line].slice(-4),
+            };
+            const stamp = context.repNumber;
+            if (decision.safety) voice.current?.enqueue(line, decision.priority, decision.key);
+            else {
+              const controller = new AbortController();
+              const timer = window.setTimeout(() => controller.abort(), 1200);
+              void requestCoachLine(context, decision, controller.signal)
+                .catch(() => null)
+                .then((optional) => {
+                  window.clearTimeout(timer);
+                  if (isStale(sessions.current[index], { ...decision, repNumber: stamp })) return;
+                  voice.current?.enqueue(optional || line, decision.priority, `${decision.key}-${stamp}`);
+                });
+            }
+          }
+          sessions.current[index] = context;
           if (scored.slice(0, current.players).every((count) => count >= current.goal))
             finish("done");
         }
@@ -325,16 +382,19 @@ export default function CoachFlow({
               ? "I couldn't clearly see your hips and knees. Step back a little."
               : "I couldn't clearly see your shoulders and hands. Step back a little.";
           setCue(feedback);
-          voice.current?.enqueue(
-            coachCommentary({
-              type: "visibility",
-              personality: current.personality,
-              name: current.names[index] || current.names[0],
-              feedback,
-            }),
-            4,
-            `see-${Math.floor(timestamp / 8000)}`,
-          );
+          let context = applyTracking(sessions.current[index], false);
+          context = { ...context, feedback };
+          const decision = decide(context);
+          if (decision.speak) {
+            const line = renderLine(context, decision);
+            context = {
+              ...context,
+              spokenKeys: [...context.spokenKeys, decision.key].slice(-12),
+              recentComments: [...context.recentComments, line].slice(-4),
+            };
+            voice.current?.enqueue(line, decision.priority, decision.key);
+          }
+          sessions.current[index] = context;
         }
         if (index === 0) {
           ghostRef.current =
@@ -465,27 +525,6 @@ export default function CoachFlow({
     arenaRef.current = "active";
     setArena("active");
   }
-  async function share() {
-    if (!summary?.record.average || summary.record.demo) return;
-    const response = await fetch("/api/leaderboard", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        nickname: summary.record.names[0],
-        exercise: summary.record.exercise,
-        challenge: summary.record.challenge,
-        average: summary.record.average,
-        reps: summary.record.reps[0] || 1,
-        demo: false,
-      }),
-    });
-    const body = await response.json();
-    setBoardNote(
-      body.enabled
-        ? "Shared nickname and score only. No video left this device."
-        : body.error || "Saved on this device only.",
-    );
-  }
   const guide = EXERCISES[settings.exercise];
   const phaseLabels =
     settings.exercise === "squats"
@@ -502,6 +541,9 @@ export default function CoachFlow({
           <button className="text-button" onClick={onExit}>
             <ChevronLeft size={16} /> Back to the network
           </button>
+          <a className="text-button" href="/leaderboard">
+            Championship board
+          </a>
           <div className="eyebrow">GUIDED MOVEMENT COACH</div>
           <h2>
             TRAIN THE <em>REP.</em>
@@ -591,6 +633,23 @@ export default function CoachFlow({
                   </button>
                 ))}
               </div>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  voice.current?.unlock();
+                  voice.current!.personality = settings.personality;
+                  voice.current?.preview(
+                    coachCommentary({
+                      type: "preview",
+                      personality: settings.personality,
+                      name: settings.names[0] || "Player",
+                    }),
+                  );
+                }}
+              >
+                Preview this coach
+              </button>
               <label className="field-label">04 / CHALLENGE</label>
               <div className="choice-row">
                 {CHALLENGES.map((challenge) => (
@@ -927,6 +986,17 @@ export default function CoachFlow({
           </div>
           <div className="recap panel">
             <p>{cue}</p>
+            <p>
+              Average {averages[summary.winner ?? 0] ?? "unscored"}. Scored reps{" "}
+              {summary.record.reps[summary.winner ?? 0] || 0}. Consistency{" "}
+              {summary.consistencies[summary.winner ?? 0] ?? "not enough reps"}.
+              {summary.improvement == null
+                ? ""
+                : ` Change across the set: ${summary.improvement > 0 ? "+" : ""}${summary.improvement}.`}
+            </p>
+            {summary.strongest && <p>Strongest measure: {summary.strongest}.</p>}
+            {summary.suggestion && <p>Next time: {summary.suggestion}</p>}
+            <p className="disclaimer">These quality estimates are experimental, not a clinical grade.</p>
             {summary.best.improved && (
               <p>Personal best. This beat your previous comparable session.</p>
             )}
@@ -950,6 +1020,31 @@ export default function CoachFlow({
             Scores are approximate, camera-dependent, and not a clinical
             assessment. A larger movement is not automatically a better one.
           </p>
+          <LeaderboardSubmit
+            demo={summary.record.demo}
+            experience="coach"
+            exercise={settings.exercise}
+            exerciseLabel={EXERCISES[settings.exercise].name}
+            challenge={summary.record.challenge}
+            challengeLabel={
+              CHALLENGES.find((item) => item.id === summary.record.challenge)?.name ||
+              summary.record.challenge
+            }
+            average={
+              averages[summary.winner ?? 0] ?? summary.record.average
+            }
+            reps={summary.record.reps[summary.winner ?? 0] || 0}
+            target={targets[summary.winner ?? 0] ?? summary.record.target}
+            durationSec={summary.record.durationSec}
+            goalReps={settings.goal}
+            consistency={
+              summary.consistencies[summary.winner ?? 0] ??
+              summary.record.consistency
+            }
+            suggestedName={
+              summary.record.names[summary.winner ?? 0] || summary.record.names[0]
+            }
+          />
           <div className="result-actions">
             <button className="primary" onClick={enterArena}>
               Practice again
@@ -957,15 +1052,10 @@ export default function CoachFlow({
             <button className="secondary" onClick={() => setStep("progress")}>
               Progress
             </button>
-            <button
-              className="secondary"
-              disabled={!summary.record.average || summary.record.demo}
-              onClick={() => void share()}
-            >
-              Share score only
-            </button>
+            <a className="text-button" href="/leaderboard">
+              Championship board
+            </a>
           </div>
-          {boardNote && <p role="status">{boardNote}</p>}
         </div>
       )}
       {step === "progress" && (
