@@ -5,11 +5,15 @@ test("championship board filters and empty or loaded state", async ({ page }) =>
   await expect(page.getByRole("heading", { name: /sand hacks/i })).toBeVisible();
   await expect(page.getByLabel("Exercise")).toBeVisible();
   await expect(page.getByLabel("Challenge")).toBeVisible();
-  await expect(page.getByLabel("Repetition goal")).toBeVisible();
+  await expect(page.getByLabel("Repetition goal")).toHaveCount(0);
+  await expect(page.getByLabel("Range target")).toHaveCount(0);
   await expect(page.getByLabel("Duration")).toHaveCount(0);
+  await page.getByLabel("Exercise").selectOption({ label: "Jumping jacks" });
+  await expect(page.getByLabel("Duration")).toHaveCount(0);
+  await expect(page.getByLabel("Challenge")).toHaveValue("reps");
   await page.getByRole("button", { name: "Refresh" }).click();
   await expect(
-    page.getByText(/no scores in this category yet|quality points|could not be loaded|unavailable/i).first(),
+    page.getByText(/no scores in this category yet|average quality|could not be loaded|unavailable/i).first(),
   ).toBeVisible();
 });
 

@@ -22,12 +22,8 @@ export function commentaryFor(
   personality: Personality,
 ): string | null {
   const player = names[event.player ?? 0] || "Our competitor";
-  const score = event.reps?.[event.player ?? 0] ?? event.scores[event.player ?? 0] ?? 0;
+  const score = event.scores[event.player ?? 0] ?? 0;
   const leader = event.scores.indexOf(Math.max(...event.scores));
-  const leaderReps = event.reps?.[leader] ?? Math.round(event.scores[leader] ?? 0);
-  const leaderForm = event.averages?.[leader];
-  const formBit =
-    leaderForm == null ? "" : `, form ${Math.round(leaderForm)}`;
   const tied =
     event.scores.length > 1 && event.scores.every((s) => s === event.scores[0]);
   const lines: Record<string, [string, string, string]> = {
@@ -46,15 +42,10 @@ export function commentaryFor(
       "A tie. Our nonexistent bookmakers are deeply concerned.",
       "Balance returns to the competitive ecosystem.",
     ],
-    HALF_TIME: [
-      "Halfway there! Leave absolutely nothing in the living room!",
-      "Halfway. Time continues to perform as expected.",
-      "At the midpoint, endurance becomes the decisive adaptation.",
-    ],
-    FINAL_TEN_SECONDS: [
-      "Ten seconds remain! This is your moment!",
-      "Ten seconds. A manageable length of sporting immortality.",
-      "The final ten seconds will reveal the strongest finish.",
+    HALFWAY_TO_GOAL: [
+      `${player} is halfway to the target! The living room can feel the momentum!`,
+      `${player} has completed half the required repetitions. Efficiently dramatic.`,
+      `${player} reaches the midpoint of the repetition target.`,
     ],
     MATCH_FINISHED: tied
       ? [
@@ -64,14 +55,14 @@ export function commentaryFor(
         ]
       : names.length === 1
         ? [
-            `Your score is ${(event.scores[0] ?? 0).toFixed(1)}, ${leaderReps} reps${formBit}. A household legend is born!`,
-            `Your score is ${(event.scores[0] ?? 0).toFixed(1)}, ${leaderReps} reps${formBit}. A personal triumph over remaining seated.`,
-            `Your score is ${(event.scores[0] ?? 0).toFixed(1)}, ${leaderReps} reps${formBit}. The display is complete.`,
+            `${names[0]} finishes with ${event.scores[0]}! A household legend is born!`,
+            `${event.scores[0]} repetitions. A personal triumph over remaining seated.`,
+            `${names[0]} completes the display with ${event.scores[0]} successful repetitions.`,
           ]
         : [
-            `${names[leader]} wins, ${leaderReps} reps${formBit}! Give that champion the imaginary trophy!`,
-            `${names[leader]} wins, ${leaderReps} reps${formBit}. The prize is the right to mention this at dinner.`,
-            `${names[leader]} wins, ${leaderReps} reps${formBit}. The others retreat with dignity intact.`,
+            `${names[leader]} wins ${event.scores.join(" to ")}! Give that champion the imaginary trophy!`,
+            `${names[leader]} wins. The prize is the right to mention this at dinner.`,
+            `${names[leader]} emerges victorious. The others retreat with dignity intact.`,
           ],
   };
   if (event.type === "REP_COMPLETED" && score > 0 && score % 5 === 0)

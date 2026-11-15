@@ -33,7 +33,7 @@ export default function LeaderboardSubmit(props: Props) {
   const [place, setPlace] = useState<{ rank: number | null; inTop10: boolean } | null>(null);
   const quality = props.experience === "coach";
   const publicBoard =
-    props.challenge === "timed" || props.challenge === "form" || props.challenge === "consistency";
+    props.challenge === "reps" || props.challenge === "form" || props.challenge === "consistency";
   const canSubmit = quality ? (props.average ?? 0) > 0 && props.reps > 0 : props.reps > 0;
   const rankingHref = (() => {
     const params = new URLSearchParams({
@@ -42,11 +42,6 @@ export default function LeaderboardSubmit(props: Props) {
       challenge: props.challenge,
       submission: key,
     });
-    if (props.experience === "arcade") params.set("duration", String(props.durationSec));
-    else {
-      params.set("goal", String(props.goalReps ?? ""));
-      if (props.target != null) params.set("target", String(Math.round(props.target)));
-    }
     return `/leaderboard?${params}`;
   })();
 
@@ -159,8 +154,8 @@ export default function LeaderboardSubmit(props: Props) {
           </dl>
           <p className="disclaimer">
             {quality
-              ? "This board ranks form quality, not how many reps you squeezed in. Only sessions with a similar selected target are compared."
-              : "This timed board ranks counted repetitions. It is separate from quality coaching scores."}{" "}
+              ? "This board ranks form quality, not how many reps you squeezed in. Your calibrated target is shown for context but does not change your board or rank."
+              : "This arcade board ranks counted repetitions. It is separate from quality coaching scores."}{" "}
             Scores are experimental and reported by your browser. They are not
             verified competition results. No video or pose data is uploaded.
           </p>

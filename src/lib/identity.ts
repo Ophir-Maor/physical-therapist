@@ -21,8 +21,6 @@ export class IdentityRegistrar {
   private seen = [-Infinity, -Infinity];
   private lastReady = false;
   private lastCenters: number[] = [];
-  private heldUntil = -Infinity;
-  private heldCenters: number[] = [];
   constructor(public count: 1 | 2) {}
   reset() {
     this.stage = "await-1";
@@ -31,20 +29,6 @@ export class IdentityRegistrar {
     this.seen = [-Infinity, -Infinity];
     this.lastReady = false;
     this.lastCenters = [];
-    this.heldUntil = -Infinity;
-    this.heldCenters = [];
-  }
-  private lockReady(timestamp: number) {
-    this.lastReady = true;
-    this.heldCenters = this.lastCenters.slice();
-    this.heldUntil = timestamp + 8000;
-  }
-  /** Keep the last good enrollment pose so a lean toward the button still confirms. */
-  private recallReady(timestamp: number) {
-    if (timestamp >= this.heldUntil || !this.heldCenters.length) return false;
-    this.lastReady = true;
-    this.lastCenters = this.heldCenters.slice();
-    return true;
   }
   /** Drop registration and ask both people to enroll again. */
   reregister() {
@@ -57,8 +41,6 @@ export class IdentityRegistrar {
       this.seen[0] = timestamp;
       this.stage = this.count === 1 ? "tracking" : "await-2";
       this.lastReady = false;
-      this.heldUntil = -Infinity;
-      this.heldCenters = [];
       return true;
     }
     if (this.stage === "await-2") {
@@ -70,8 +52,6 @@ export class IdentityRegistrar {
       this.seen[1] = timestamp;
       this.stage = "tracking";
       this.lastReady = false;
-      this.heldUntil = -Infinity;
-      this.heldCenters = [];
       return true;
     }
     return false;
@@ -87,8 +67,7 @@ export class IdentityRegistrar {
     this.ambiguous = false;
     this.lastReady = false;
     if (this.stage === "await-1") {
-      if (candidates.length === 1) this.lockReady(timestamp);
-      else if (candidates.length === 0) this.recallReady(timestamp);
+      this.lastReady = candidates.length === 1;
       if (candidates[0]) assigned[0] = candidates[0].pose;
       return {
         assigned,
@@ -98,7 +77,7 @@ export class IdentityRegistrar {
         message:
           candidates.length > 1
             ? "One person at a time. Player 2, step out for a moment."
-            : this.lastReady
+            : candidates.length === 1
               ? "Player 1 detected. Confirm the blue registration."
               : "Player 1, step into the frame alone.",
       };
@@ -107,8 +86,7 @@ export class IdentityRegistrar {
       const anchor = this.anchors[0] ?? 0.3;
       const near = candidates.find((item) => Math.abs(item.x - anchor) < 0.18);
       const far = candidates.filter((item) => Math.abs(item.x - anchor) >= 0.18);
-      if (far.length === 1) this.lockReady(timestamp);
-      else if (far.length === 0) this.recallReady(timestamp);
+      this.lastReady = far.length === 1;
       assigned[0] = (near ?? candidates[0])?.pose ?? null;
       assigned[1] = far[0]?.pose ?? null;
       return {

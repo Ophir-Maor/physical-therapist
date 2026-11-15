@@ -434,24 +434,24 @@ export function renderFixed(
     supportive: {
       intro: `${name}, we'll work on control and your selected target. Stop if anything feels painful.`,
       preview:
-        "I'm the supportive coach. I'll notice when a rep gets smoother, and I won't pile on when one doesn't. Stop if anything hurts.",
+        "Hi, I'm Sarah, your supportive coach. We'll build smooth, controlled reps together. Let's get ready to work, and stop if anything hurts.",
       stop: `${name}, we stopped. That's the right call if something hurts or you're done.`,
     },
     drill: {
       intro: `${name}, controlled reps. Stop immediately if you feel pain.`,
       preview:
-        "Drill sergeant here. I'll give you a hard time about sloppy reps, and I still want you to stop if something hurts.",
+        "Callum here, your drill sergeant. Sharp control, no sloppy shortcuts. Let's get to work—and stop immediately if something hurts.",
       stop: `${name}, session stopped. We don't train through pain.`,
     },
     hype: {
       intro: `${name}, we're scoring control, not speed. Stop if you feel pain.`,
       preview:
-        "Hype commentator. I'll get loud for a genuinely sharp rep, then get out of the way. Stop if you feel pain.",
+        "Charlie here, your hype commentator! Bring me one sharp rep at a time and I'll bring the energy. Let's get ready to work—and stop if you feel pain.",
       stop: `${name}, you called it. Stopping when you need to is part of the set.`,
     },
     calm: {
       intro: `${name}, move to your target and come back slowly. Stop if you feel pain.`,
-      preview: "Calm instructor. Short cues, no extra noise. Stop if you feel pain.",
+      preview: "Hi, I'm River, your calm instructor. We'll move slowly, breathe, and keep each cue clear. Let's begin, and stop if you feel pain.",
       stop: `${name}, session stopped. End a set whenever you need to.`,
     },
   } as const;

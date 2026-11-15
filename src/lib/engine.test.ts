@@ -73,41 +73,9 @@ it("jumping jacks require separated ankles; arm raises do not require legs", () 
   expect(hold(jack, false, 800)).toBe(0);
   expect(hold(arm, false, 800)).toBe(1);
 });
-it("keeps a short peak when one frame blinks and grades the full synthetic jack", () => {
-  const detector = new ActivityDetector("jumping-jacks");
-  hold(detector, false, 0);
-  detector.update(syntheticPose(true), 500);
-  detector.update(syntheticPose(true), 540);
-  expect(detector.update([], 580)).toEqual([]);
-  expect(detector.state).toBe("open");
-  const events = [];
-  for (let t = 900; t < 1300; t += 40)
-    events.push(...detector.update(syntheticPose(false), t));
-  expect(events).toHaveLength(1);
-  expect(events[0].grade.form).toBeGreaterThanOrEqual(90);
-  expect(events[0].grade.points).toBeGreaterThanOrEqual(1.9);
-});
-it("shows too fast while an arm raise is still moving", () => {
-  const detector = new ActivityDetector("arm-raises", { smoothing: 1 });
-  const closed = syntheticPose(false);
-  const open = syntheticPose(true);
-  const at = (amount: number) => {
-    const pose = syntheticPose(false);
-    for (const index of [13, 14, 15, 16]) {
-      pose[index] = {
-        ...pose[index],
-        y: closed[index].y + (open[index].y - closed[index].y) * amount,
-      };
-    }
-    return pose;
-  };
-  for (let step = 0; step <= 5; step += 1)
-    detector.update(at(step / 5), step * 40);
-  expect(detector.meters.pace).toBe("fast");
-});
-describe("game clock and scoring", () => {
+describe("rep-goal game scoring", () => {
   it("scores, emits lead changes, ties and milestones", () => {
-    const g = new GameEngine({ duration: 30, players: ["A", "B"] });
+    const g = new GameEngine({ goal: 10, players: ["A", "B"] });
     g.start(1000);
     g.rep(0, 1100);
     g.rep(1, 1200);
@@ -124,65 +92,41 @@ describe("game clock and scoring", () => {
     g.rep(1, 1600);
     expect(g.events.filter((e) => e.type === "MILESTONE")).toHaveLength(1);
   });
-  it("uses elapsed time, emits timing events once, and excludes buzzer reps", () => {
-    const g = new GameEngine({ duration: 30, players: ["A", "B"] });
+  it("ends as soon as a player reaches the repetition goal", () => {
+    const g = new GameEngine({ goal: 3, players: ["A", "B"] });
     g.start(1000);
     g.rep(0, 2000);
-    g.tick(16000);
-    expect(g.remaining).toBe(15);
-    g.tick(21000);
-    g.tick(22000);
-    g.rep(1, 31000);
+    g.rep(1, 3000);
+    g.rep(0, 4000);
+    expect(g.events.filter((e) => e.type === "HALFWAY_TO_GOAL")).toHaveLength(1);
+    g.rep(0, 5000);
+    g.rep(1, 6000);
     expect(g.state).toBe("complete");
-    expect(g.scores).toEqual([1, 0]);
+    expect(g.scores).toEqual([3, 1]);
     expect(g.winner).toBe(0);
-    for (const type of ["HALF_TIME", "FINAL_TEN_SECONDS", "MATCH_FINISHED"])
-      expect(g.events.filter((e) => e.type === type)).toHaveLength(1);
+    expect(g.events.filter((e) => e.type === "MATCH_FINISHED")).toHaveLength(1);
   });
-  it("handles ties, practice, reset and stale timestamps", () => {
-    const g = new GameEngine({ duration: 1, players: ["A", "B"] });
+  it("handles solo practice, reset and stale timestamps", () => {
+    const g = new GameEngine({ goal: 1, players: ["A", "B"] });
     g.start(0);
-    g.tick(1000);
-    expect(g.winner).toBeNull();
+    g.rep(0, 1000);
+    expect(g.winner).toBe(0);
     g.reset();
     expect(g.events).toEqual([]);
-    expect(g.remaining).toBe(1);
     g.start(2000);
     g.rep(0, 2100);
     g.rep(1, 2050);
     expect(g.scores).toEqual([1, 0]);
-    const solo = new GameEngine({ duration: 1, players: ["A"] });
+    const solo = new GameEngine({ goal: 1, players: ["A"] });
     solo.start(0);
-    solo.tick(1000);
+    solo.rep(0, 1000);
     expect(solo.winner).toBe(0);
   });
   it("snapshots event scores without subsequent mutation", () => {
-    const g = new GameEngine({ duration: 30, players: ["A"] });
+    const g = new GameEngine({ goal: 5, players: ["A"] });
     g.start(0);
     g.rep(0, 1);
     expect(g.events[0].scores).toEqual([0]);
-  });
-  it("adds a form bonus and freezes the clock while paused", () => {
-    const g = new GameEngine({ duration: 30, players: ["A", "B"] });
-    g.start(0);
-    g.rep(0, 100, { form: 100, weakest: "clean" });
-    g.rep(1, 200, { form: 40, weakest: "feet" });
-    expect(g.scores).toEqual([2, 1.4]);
-    expect(g.repCounts).toEqual([1, 1]);
-    expect(g.averages[1]).toBe(40);
-    g.tick(1000);
-    g.pause(1000);
-    g.tick(6000);
-    g.rep(0, 4000, { form: 100 });
-    expect(g.remaining).toBe(29);
-    expect(g.scores[0]).toBe(2);
-    g.resume(6000);
-    g.tick(7000);
-    expect(g.remaining).toBe(28);
-    for (let n = 0; n < 4; n += 1) g.rep(1, 7100 + n, { form: 40 });
-    expect(g.events.filter((event) => event.type === "MILESTONE")).toHaveLength(
-      1,
-    );
   });
 });
 describe("spatial association", () => {

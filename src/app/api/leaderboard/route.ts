@@ -1,10 +1,5 @@
 import { z } from "zod";
-import {
-  ARCADE_DURATIONS,
-  COACH_GOALS,
-  type BoardChallenge,
-  type BoardExperience,
-} from "../../../lib/boards";
+import { type BoardChallenge, type BoardExperience } from "../../../lib/boards";
 import { databaseConfigured, getSql } from "../../../lib/db";
 import { allowsSameSite } from "../../../lib/same-origin";
 
@@ -16,7 +11,7 @@ const challenges = z.enum([
   "form",
   "consistency",
   "personal-best",
-  "timed",
+  "reps",
 ]);
 const schema = z
   .object({
@@ -27,7 +22,7 @@ const schema = z
     average: z.number().min(0).max(100).nullable(),
     reps: z.number().int().min(0).max(200),
     target: z.number().min(0).max(180).nullable(),
-    durationSec: z.number().int().min(1).max(600),
+    durationSec: z.number().int().min(0).max(600),
     goalReps: z.number().int().min(1).max(50).nullable().optional(),
     consistency: z.number().min(0).max(100).nullable().optional(),
     submissionKey: z.string().uuid(),
@@ -48,43 +43,10 @@ const schema = z
         message: "At least one counted rep is required.",
         path: ["reps"],
       });
-    if (value.experience === "coach" && value.challenge === "timed")
-      ctx.addIssue({ code: "custom", message: "Coach sessions are not timed boards.", path: ["challenge"] });
-    if (value.experience === "arcade" && value.challenge !== "timed")
-      ctx.addIssue({ code: "custom", message: "Arcade sessions use the timed board.", path: ["challenge"] });
-    if (
-      value.experience === "arcade" &&
-      !ARCADE_DURATIONS.includes(value.durationSec as 15 | 30 | 60)
-    )
-      ctx.addIssue({
-        code: "custom",
-        message: "Arcade boards are 15, 30, or 60 seconds.",
-        path: ["durationSec"],
-      });
-    if (
-      (value.challenge === "form" || value.challenge === "consistency") &&
-      !COACH_GOALS.includes((value.goalReps ?? 0) as 4 | 6 | 8)
-    )
-      ctx.addIssue({
-        code: "custom",
-        message: "Choose a 4, 6, or 8 repetition goal.",
-        path: ["goalReps"],
-      });
-    if (value.challenge === "consistency" && value.consistency == null)
-      ctx.addIssue({
-        code: "custom",
-        message: "Consistency needs at least two scored repetitions.",
-        path: ["consistency"],
-      });
-    if (
-      (value.challenge === "form" || value.challenge === "consistency") &&
-      (value.target == null || value.target <= 0)
-    )
-      ctx.addIssue({
-        code: "custom",
-        message: "A range target is required for this challenge.",
-        path: ["target"],
-      });
+    if (value.experience === "coach" && value.challenge === "reps")
+      ctx.addIssue({ code: "custom", message: "Coach sessions use quality challenges.", path: ["challenge"] });
+    if (value.experience === "arcade" && value.challenge !== "reps")
+      ctx.addIssue({ code: "custom", message: "Arcade sessions use the rep board.", path: ["challenge"] });
   });
 
 let windowStart = 0;
@@ -132,9 +94,6 @@ type Filters = {
   exercise: string;
   challenge: BoardChallenge;
   experience: BoardExperience;
-  durationSec: number | null;
-  goalReps: number | null;
-  target: number | null;
 };
 
 async function topTen(filters: Filters, highlight: string | null) {
@@ -146,9 +105,8 @@ async function topTen(filters: Filters, highlight: string | null) {
                  target_deg, goal_reps, duration_sec, created_at, submission_key
           from leaderboard
           where exercise = ${filters.exercise}
-            and challenge = 'timed'
+            and challenge = 'reps'
             and experience = 'arcade'
-            and duration_sec = ${filters.durationSec}
             and reps >= 1
           order by reps desc, created_at asc, id asc
           limit 10`
@@ -160,12 +118,9 @@ async function topTen(filters: Filters, highlight: string | null) {
             where exercise = ${filters.exercise}
               and challenge = 'consistency'
               and experience = 'coach'
-              and goal_reps = ${filters.goalReps}
-              and reps >= ${filters.goalReps}
-              and consistency is not null
+              and average is not null
               and scoring_version = 'form-v1'
-              and target_deg between ${filters.target! * 0.9} and ${filters.target! * 1.1}
-            order by consistency desc, created_at asc, id asc
+            order by average desc, consistency desc nulls last, created_at asc, id asc
             limit 10`
         : await sql`
             select nickname, exercise, challenge, experience, average, consistency, reps,
@@ -174,11 +129,8 @@ async function topTen(filters: Filters, highlight: string | null) {
             where exercise = ${filters.exercise}
               and challenge = 'form'
               and experience = 'coach'
-              and goal_reps = ${filters.goalReps}
-              and reps >= ${filters.goalReps}
               and average is not null
               and scoring_version = 'form-v1'
-              and target_deg between ${filters.target! * 0.9} and ${filters.target! * 1.1}
             order by average desc, consistency desc nulls last, created_at asc, id asc
             limit 10`;
   return rows.map((entry, index) =>
@@ -203,13 +155,8 @@ async function placeOf(filters: Filters, highlight: string) {
   const eligible =
     sameBoard &&
     (filters.experience === "arcade"
-      ? Number(row.duration_sec) === filters.durationSec && Number(row.reps) >= 1
-      : Number(row.goal_reps) === filters.goalReps &&
-        Number(row.reps) >= Number(filters.goalReps) &&
-        row.target_deg != null &&
-        Number(row.target_deg) >= filters.target! * 0.9 &&
-        Number(row.target_deg) <= filters.target! * 1.1 &&
-        (filters.challenge === "consistency" ? row.consistency != null : row.average != null));
+      ? Number(row.reps) >= 1
+      : row.average != null);
   if (!eligible) return { rank: null as number | null, inTop10: false };
   const better =
     filters.experience === "arcade"
@@ -217,9 +164,8 @@ async function placeOf(filters: Filters, highlight: string) {
           select count(*)::int as n
           from leaderboard
           where exercise = ${filters.exercise}
-            and challenge = 'timed'
+            and challenge = 'reps'
             and experience = 'arcade'
-            and duration_sec = ${filters.durationSec}
             and reps >= 1
             and (
               reps > ${row.reps}
@@ -233,15 +179,22 @@ async function placeOf(filters: Filters, highlight: string) {
             where exercise = ${filters.exercise}
               and challenge = 'consistency'
               and experience = 'coach'
-              and goal_reps = ${filters.goalReps}
-              and reps >= ${filters.goalReps}
-              and consistency is not null
+              and average is not null
               and scoring_version = 'form-v1'
-              and target_deg between ${filters.target! * 0.9} and ${filters.target! * 1.1}
               and (
-                consistency > ${row.consistency}
-                or (consistency = ${row.consistency} and created_at < ${row.created_at})
-                or (consistency = ${row.consistency} and created_at = ${row.created_at} and id < ${row.id})
+                average > ${row.average}
+                or (average = ${row.average} and coalesce(consistency, -1) > coalesce(${row.consistency}::numeric, -1))
+                or (
+                  average = ${row.average}
+                  and coalesce(consistency, -1) = coalesce(${row.consistency}::numeric, -1)
+                  and created_at < ${row.created_at}
+                )
+                or (
+                  average = ${row.average}
+                  and coalesce(consistency, -1) = coalesce(${row.consistency}::numeric, -1)
+                  and created_at = ${row.created_at}
+                  and id < ${row.id}
+                )
               )`
         : await sql`
             select count(*)::int as n
@@ -249,11 +202,8 @@ async function placeOf(filters: Filters, highlight: string) {
             where exercise = ${filters.exercise}
               and challenge = 'form'
               and experience = 'coach'
-              and goal_reps = ${filters.goalReps}
-              and reps >= ${filters.goalReps}
               and average is not null
               and scoring_version = 'form-v1'
-              and target_deg between ${filters.target! * 0.9} and ${filters.target! * 1.1}
               and (
                 average > ${row.average}
                 or (average = ${row.average} and coalesce(consistency, -1) > coalesce(${row.consistency}::numeric, -1))
@@ -276,43 +226,29 @@ async function placeOf(filters: Filters, highlight: string) {
 function filtersFrom(url: URL): Filters | null {
   const exercise = exercises.safeParse(url.searchParams.get("exercise"));
   const challenge = z
-    .enum(["timed", "form", "consistency"])
+    .enum(["reps", "form", "consistency"])
     .safeParse(url.searchParams.get("challenge"));
   const experience = z.enum(["coach", "arcade"]).safeParse(url.searchParams.get("experience"));
   if (!exercise.success || !challenge.success || !experience.success) return null;
   if (experience.data === "arcade") {
-    const duration = Number(url.searchParams.get("duration"));
-    if (!ARCADE_DURATIONS.includes(duration as 15 | 30 | 60)) return null;
-    if (challenge.data !== "timed") return null;
+    if (challenge.data !== "reps") return null;
     return {
       exercise: exercise.data,
-      challenge: "timed",
+      challenge: "reps",
       experience: "arcade",
-      durationSec: duration,
-      goalReps: null,
-      target: null,
     };
   }
-  const goal = Number(url.searchParams.get("goal"));
-  const target = Number(url.searchParams.get("target"));
-  if (!COACH_GOALS.includes(goal as 4 | 6 | 8)) return null;
-  if (!Number.isFinite(target) || target <= 0 || target > 180) return null;
-  if (challenge.data === "timed") return null;
+  if (challenge.data === "reps") return null;
   return {
     exercise: exercise.data,
     challenge: challenge.data,
     experience: "coach",
-    durationSec: null,
-    goalReps: goal,
-    target,
   };
 }
 
 function kindOf(filters: Filters) {
-  if (filters.challenge === "timed") return { kind: "reps", unit: "reps" };
-  if (filters.challenge === "consistency")
-    return { kind: "consistency", unit: "consistency" };
-  return { kind: "quality", unit: "quality points" };
+  if (filters.challenge === "reps") return { kind: "reps", unit: "reps" };
+  return { kind: "quality", unit: "average quality" };
 }
 
 export async function GET(request: Request) {
@@ -324,7 +260,7 @@ export async function GET(request: Request) {
       {
         enabled: true,
         entries: [],
-        message: "Choose a supported exercise, challenge, and duration or repetition goal.",
+        message: "Choose a supported exercise and challenge.",
       },
       { status: 400 },
     );
@@ -337,7 +273,7 @@ export async function GET(request: Request) {
       entries,
       ...kindOf(filters),
       tieBreak:
-        filters.challenge === "form"
+        filters.experience === "coach"
           ? "Quality first. Consistency breaks a tie, then the earlier submission."
           : "When scores match, the earlier submission ranks higher.",
       place,
@@ -386,7 +322,7 @@ export async function POST(request: Request) {
   if (!/^[\p{L}\p{N} .'_-]+$/u.test(data.nickname))
     return Response.json({ error: "Use a short display name." }, { status: 400 });
   const publicChallenge =
-    data.challenge === "timed" || data.challenge === "form" || data.challenge === "consistency"
+    data.challenge === "reps" || data.challenge === "form" || data.challenge === "consistency"
       ? data.challenge
       : null;
   const filters: Filters | null = publicChallenge
@@ -394,9 +330,6 @@ export async function POST(request: Request) {
         exercise: data.exercise,
         challenge: publicChallenge,
         experience: data.experience,
-        durationSec: data.experience === "arcade" ? data.durationSec : null,
-        goalReps: data.goalReps ?? null,
-        target: data.experience === "coach" ? data.target : null,
       }
     : null;
   try {
@@ -429,7 +362,7 @@ export async function POST(request: Request) {
           ${data.consistency ?? null},
           ${data.reps},
           ${data.experience === "coach" ? data.target : null},
-          ${data.experience === "arcade" ? data.durationSec : null},
+          ${null},
           ${data.goalReps ?? null},
           ${data.experience === "coach" ? "form-v1" : null},
           ${data.submissionKey}
@@ -443,7 +376,7 @@ export async function POST(request: Request) {
       duplicate: existing.length > 0,
       entries,
       place,
-      ...(filters ? kindOf(filters) : { kind: "quality", unit: "quality points" }),
+      ...(filters ? kindOf(filters) : { kind: "quality", unit: "average quality" }),
       message: !publicChallenge
         ? "Saved. Practice and personal-best sessions are not public championship boards."
         : existing.length

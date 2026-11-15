@@ -1,17 +1,13 @@
 import { SCORING_VERSION } from "./session-context";
 
-export const ARCADE_DURATIONS = [15, 30, 60] as const;
-export const COACH_GOALS = [4, 6, 8] as const;
-
 export type BoardExperience = "arcade" | "coach";
-export type BoardChallenge = "timed" | "form" | "consistency";
+export type BoardChallenge = "reps" | "form" | "consistency";
 
 export type Activity = {
   exercise: "jumping-jacks" | "arm-raises" | "squats";
   experience: BoardExperience;
   label: string;
   challenges: readonly BoardChallenge[];
-  targets: readonly number[];
 };
 
 export const ACTIVITIES: Activity[] = [
@@ -19,34 +15,30 @@ export const ACTIVITIES: Activity[] = [
     exercise: "jumping-jacks",
     experience: "arcade",
     label: "Jumping jacks",
-    challenges: ["timed"],
-    targets: [],
+    challenges: ["reps"],
   },
   {
     exercise: "arm-raises",
     experience: "arcade",
     label: "Arm raises",
-    challenges: ["timed"],
-    targets: [],
+    challenges: ["reps"],
   },
   {
     exercise: "arm-raises",
     experience: "coach",
     label: "Controlled arm raises",
     challenges: ["form", "consistency"],
-    targets: [45, 60, 75, 90],
   },
   {
     exercise: "squats",
     experience: "coach",
     label: "Controlled squats",
     challenges: ["form", "consistency"],
-    targets: [25, 35, 45, 60],
   },
 ];
 
 export const CHALLENGE_LABELS: Record<BoardChallenge, string> = {
-  timed: "Arcade Championship",
+  reps: "Arcade Championship",
   form: "Form Challenge",
   consistency: "Consistency Challenge",
 };
@@ -59,12 +51,6 @@ export function findActivity(exercise: string, experience: string) {
   return ACTIVITIES.find(
     (item) => item.exercise === exercise && item.experience === experience,
   );
-}
-
-/** Same 10% window the app already uses for personal-best comparisons. */
-export function sameTarget(left: number, right: number) {
-  if (left <= 0 || right <= 0) return false;
-  return Math.abs(left - right) / left <= 0.1;
 }
 
 export type ScoreRow = {
@@ -87,15 +73,11 @@ export type BoardFilter = {
   exercise: string;
   experience: BoardExperience;
   challenge: BoardChallenge;
-  durationSec?: number;
-  goalReps?: number;
-  target?: number;
   scoringVersion?: string;
 };
 
 export function metric(row: ScoreRow, challenge: BoardChallenge) {
-  if (challenge === "timed") return row.reps;
-  if (challenge === "consistency") return row.consistency;
+  if (challenge === "reps") return row.reps;
   return row.average;
 }
 
@@ -103,11 +85,7 @@ export function inCategory(row: ScoreRow, filter: BoardFilter) {
   if (row.exercise !== filter.exercise || row.experience !== filter.experience)
     return false;
   if (row.challenge !== filter.challenge) return false;
-  if (filter.challenge === "timed") return row.durationSec === filter.durationSec && row.reps >= 1;
-  if (filter.goalReps == null || filter.target == null) return false;
-  if (row.goalReps !== filter.goalReps || row.target == null) return false;
-  if (row.reps < filter.goalReps) return false;
-  if (!sameTarget(row.target, filter.target)) return false;
+  if (filter.challenge === "reps") return row.reps >= 1;
   if ((row.scoringVersion ?? "") !== (filter.scoringVersion ?? SCORING_VERSION)) return false;
   return metric(row, filter.challenge) != null;
 }
@@ -120,7 +98,7 @@ export function rankTop(rows: ScoreRow[], filter: BoardFilter) {
   return rows
     .filter((row) => inCategory(row, filter))
     .sort((a, b) => {
-      if (filter.challenge === "form") {
+      if (filter.challenge !== "reps") {
         const quality = (b.average ?? -1) - (a.average ?? -1);
         if (quality !== 0) return quality;
         const steadiness = (b.consistency ?? -1) - (a.consistency ?? -1);

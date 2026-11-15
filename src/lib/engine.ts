@@ -1,13 +1,3 @@
-import {
-  gradeCycle,
-  livePace,
-  samplePose,
-  type BroadcastGrade,
-  type LiveMeters,
-} from "./broadcast-score";
-
-export type { BroadcastGrade, LiveMeters };
-
 export type Landmark = {
   x: number;
   y: number;
@@ -15,10 +5,7 @@ export type Landmark = {
   visibility?: number;
 };
 export type Mode = "jumping-jacks" | "arm-raises";
-export type ActivityEvent = {
-  type: "REP_COMPLETED";
-  grade: BroadcastGrade;
-};
+export type ActivityEvent = { type: "REP_COMPLETED" };
 export type DetectorOptions = {
   confidence: number;
   holdMs: number;
@@ -50,15 +37,6 @@ const valid = (p: Landmark | undefined, confidence = 0.55): p is Landmark =>
 /** A full, held closed → open → closed cycle. Times are monotonic milliseconds. */
 export class ActivityDetector {
   state = "seeking-closed";
-  meters: LiveMeters = {
-    arms: null,
-    feet: null,
-    bestArms: 0,
-    bestFeet: 0,
-    covered: false,
-    pace: "idle",
-  };
-  private armTrail: { t: number; arms: number }[] = [];
   private options: DetectorOptions;
   private smooth: Landmark[] | null = null;
   private lastSeen = -Infinity;
@@ -66,12 +44,6 @@ export class ActivityDetector {
   private candidate = "";
   private candidateSince = 0;
   private cycleSince = 0;
-  private neutralAt = -1;
-  private peakArms = 0;
-  private peakFeet: number | null = null;
-  private peakLean: number | null = null;
-  private peakScore = -1;
-  private openedAt = -1;
   constructor(
     public mode: Mode,
     options: Partial<DetectorOptions> = {},
@@ -85,51 +57,6 @@ export class ActivityDetector {
     this.lastTime = -Infinity;
     this.candidate = "";
     this.cycleSince = 0;
-    this.neutralAt = -1;
-    this.peakArms = 0;
-    this.peakFeet = null;
-    this.peakLean = null;
-    this.peakScore = -1;
-    this.openedAt = -1;
-    this.armTrail = [];
-    this.meters = {
-      arms: null,
-      feet: null,
-      bestArms: 0,
-      bestFeet: 0,
-      covered: false,
-      pace: "idle",
-    };
-  }
-  private notePace(arms: number | null, timestamp: number) {
-    if (this.mode !== "arm-raises" || arms == null) {
-      this.armTrail = [];
-      this.meters.pace = "idle";
-      return;
-    }
-    this.armTrail.push({ t: timestamp, arms });
-    this.armTrail = this.armTrail.filter((sample) => timestamp - sample.t <= 400);
-    const first = this.armTrail[0];
-    const elapsed = timestamp - first.t;
-    const delta = Math.abs(arms - first.arms);
-    if (this.armTrail.length < 2 || elapsed < 80 || delta < 12) {
-      this.meters.pace = "idle";
-      return;
-    }
-    this.meters.pace = livePace(delta / (elapsed / 1000));
-  }
-  private rememberPeak(sample: ReturnType<typeof samplePose>) {
-    const openScore = (sample.arms ?? 0) + (sample.feet ?? 0);
-    if (sample.arms != null && openScore >= this.peakScore) {
-      this.peakScore = openScore;
-      this.peakArms = sample.arms;
-      this.peakFeet = sample.feet;
-      this.peakLean = sample.lean;
-    }
-    if (sample.arms != null)
-      this.meters.bestArms = Math.max(this.meters.bestArms, sample.arms);
-    if (sample.feet != null)
-      this.meters.bestFeet = Math.max(this.meters.bestFeet, sample.feet);
   }
   update(landmarks: Landmark[], timestamp: number): ActivityEvent[] {
     if (!Number.isFinite(timestamp) || timestamp <= this.lastTime) return [];
@@ -139,11 +66,8 @@ export class ActivityDetector {
         ? [11, 12, 15, 16, 23, 24, 27, 28]
         : [11, 12, 15, 16];
     if (!ids.every((i) => valid(landmarks[i], this.options.confidence))) {
-      const gap = timestamp - this.lastSeen;
-      this.meters = { ...this.meters, covered: false, pace: "idle" };
-      if (gap <= 200) return [];
       this.candidate = "";
-      if (gap > this.options.missingResetMs) {
+      if (timestamp - this.lastSeen > this.options.missingResetMs) {
         this.state = "seeking-closed";
         this.smooth = null;
       }
@@ -162,15 +86,6 @@ export class ActivityDetector {
       y: this.smooth?.[i] ? alpha * p.y + (1 - alpha) * this.smooth[i].y : p.y,
     }));
     const p = this.smooth;
-    const sample = samplePose(p, this.mode);
-    this.meters = {
-      ...this.meters,
-      arms: sample.arms,
-      feet: this.mode === "jumping-jacks" ? sample.feet : null,
-      covered: sample.covered,
-    };
-    this.notePace(sample.arms, timestamp);
-    if (this.state === "closed" || this.state === "open") this.rememberPeak(sample);
     const shoulderWidth = Math.hypot(p[11].x - p[12].x, p[11].y - p[12].y);
     if (shoulderWidth < 0.035) {
       this.candidate = "";
@@ -203,53 +118,22 @@ export class ActivityDetector {
               legSpread < this.options.closedLegRatio)
           ? "closed"
           : "neutral";
-    if (
-      pose === "neutral" &&
-      (this.candidate === "open" || this.candidate === "closed")
-    ) {
-      if (this.neutralAt < 0) this.neutralAt = timestamp;
-      if (timestamp - this.neutralAt < 120) return [];
-    } else this.neutralAt = -1;
-    const opening = pose === "open" && this.state === "closed";
     if (pose !== this.candidate) {
       this.candidate = pose;
       this.candidateSince = timestamp;
-      if (!opening) return [];
-    }
-    if (opening) {
-      this.state = "open";
-      this.openedAt = timestamp;
-      this.rememberPeak(sample);
       return [];
     }
     if (timestamp - this.candidateSince < this.options.holdMs) return [];
     if (pose === "closed" && this.state === "seeking-closed") {
       this.state = "closed";
       this.cycleSince = timestamp;
-    } else if (pose === "closed" && this.state === "open") {
+    } else if (pose === "open" && this.state === "closed") this.state = "open";
+    else if (pose === "closed" && this.state === "open") {
       this.state = "closed";
       const elapsed = timestamp - this.cycleSince;
       this.cycleSince = timestamp;
-      if (elapsed >= this.options.minimumCycleMs) {
-        const grade = gradeCycle(
-          this.mode,
-          {
-            arms: this.peakArms,
-            feet: this.mode === "jumping-jacks" ? this.peakFeet : null,
-            lean: this.peakLean,
-          },
-          { armsReturn: sample.armsReturn, feetReturn: sample.feetReturn },
-          this.openedAt > 0 ? timestamp - this.openedAt : undefined,
-        );
-        this.peakArms = 0;
-        this.peakFeet = null;
-        this.peakLean = null;
-        this.peakScore = -1;
-        this.openedAt = -1;
-        this.meters.bestArms = 0;
-        this.meters.bestFeet = 0;
-        return [{ type: "REP_COMPLETED", grade }];
-      }
+      if (elapsed >= this.options.minimumCycleMs)
+        return [{ type: "REP_COMPLETED" }];
     }
     return [];
   }
@@ -325,173 +209,90 @@ export type GameEventType =
   | "PLAYER_TAKES_LEAD"
   | "SCORE_TIED"
   | "MILESTONE"
-  | "HALF_TIME"
-  | "FINAL_TEN_SECONDS"
+  | "HALFWAY_TO_GOAL"
   | "MATCH_FINISHED";
 export type GameEvent = {
   id: string;
   type: GameEventType;
   player?: number;
   scores: number[];
-  reps: number[];
-  averages: number[];
   timestamp: number;
-  form?: number;
-  points?: number;
-  weakest?: string;
 };
 export class GameEngine {
   state: "idle" | "active" | "complete" = "idle";
   scores: number[];
-  repCounts: number[];
   events: GameEvent[] = [];
-  remaining: number;
   winner: number | null = null;
-  paused = false;
-  private startedAt = 0;
   private lastTime = 0;
-  private half = false;
-  private finalTen = false;
-  private formSums: number[];
-  private pausedTotal = 0;
-  private pauseStarted = 0;
-  readonly duration: number;
+  private halfway = new Set<number>();
+  readonly goal: number;
   readonly players: string[];
-  constructor(options: { duration: number; players: string[] }) {
-    this.duration = Math.max(
+  constructor(options: { goal: number; players: string[] }) {
+    this.goal = Math.max(
       1,
-      Number.isFinite(options.duration) ? options.duration : 30,
+      Math.round(Number.isFinite(options.goal) ? options.goal : 10),
     );
     this.players = options.players.slice(0, 2);
     if (!this.players.length) this.players = ["Player 1"];
     this.scores = this.players.map(() => 0);
-    this.repCounts = this.players.map(() => 0);
-    this.formSums = this.players.map(() => 0);
-    this.remaining = this.duration;
   }
-  get averages() {
-    return this.repCounts.map((count, index) =>
-      count ? this.formSums[index] / count : 0,
-    );
-  }
-  private emit(
-    type: GameEventType,
-    timestamp: number,
-    player?: number,
-    detail?: { form?: number; points?: number; weakest?: string },
-  ) {
+  private emit(type: GameEventType, timestamp: number, player?: number) {
     this.events.push({
       id: `${this.events.length}-${type}`,
       type,
       timestamp,
       scores: [...this.scores],
-      reps: [...this.repCounts],
-      averages: this.averages,
       ...(player === undefined ? {} : { player }),
-      ...detail,
     });
   }
   start(timestamp: number) {
     if (this.state !== "idle" || !Number.isFinite(timestamp)) return;
     this.state = "active";
-    this.startedAt = this.lastTime = timestamp;
+    this.lastTime = timestamp;
     this.emit("MATCH_STARTED", timestamp);
   }
-  pause(timestamp: number) {
-    if (this.state !== "active" || this.paused || !Number.isFinite(timestamp))
-      return;
-    this.paused = true;
-    this.pauseStarted = timestamp;
-  }
-  resume(timestamp: number) {
-    if (!this.paused || !Number.isFinite(timestamp)) return;
-    this.pausedTotal += Math.max(0, timestamp - this.pauseStarted);
-    this.paused = false;
-    this.lastTime = timestamp;
-  }
-  tick(timestamp: number) {
-    if (
-      this.state !== "active" ||
-      this.paused ||
-      !Number.isFinite(timestamp) ||
-      timestamp < this.lastTime
-    )
-      return;
-    this.lastTime = timestamp;
-    this.remaining = Math.max(
-      0,
-      this.duration - (timestamp - this.startedAt - this.pausedTotal) / 1000,
-    );
-    if (!this.half && this.remaining <= this.duration / 2) {
-      this.half = true;
-      this.emit("HALF_TIME", timestamp);
-    }
-    if (!this.finalTen && this.remaining <= 10) {
-      this.finalTen = true;
-      this.emit("FINAL_TEN_SECONDS", timestamp);
-    }
-    if (this.remaining === 0) {
-      this.state = "complete";
-      this.winner =
-        this.scores.length === 1
-          ? 0
-          : this.scores[0] === this.scores[1]
-            ? null
-            : this.scores[0] > this.scores[1]
-              ? 0
-              : 1;
-      this.emit("MATCH_FINISHED", timestamp, this.winner ?? undefined);
-    }
-  }
-  rep(
-    player: number,
-    timestamp: number,
-    detail?: { form?: number; weakest?: string },
-  ) {
+  rep(player: number, timestamp: number) {
     if (!Number.isFinite(timestamp) || timestamp < this.lastTime) return;
-    this.tick(timestamp);
     if (
       this.state !== "active" ||
-      this.paused ||
       !Number.isInteger(player) ||
       player < 0 ||
       player >= this.scores.length
     )
       return;
-    const form = Math.max(0, Math.min(100, detail?.form ?? 0));
-    const points = Math.round((1 + form / 100) * 100) / 100;
+    this.lastTime = timestamp;
     const previous =
       this.scores.length === 2 ? Math.sign(this.scores[0] - this.scores[1]) : 0;
-    this.repCounts[player] += 1;
-    this.formSums[player] += form;
-    this.scores[player] =
-      Math.round((this.scores[player] + points) * 100) / 100;
-    this.emit("REP_COMPLETED", timestamp, player, {
-      form,
-      points,
-      weakest: detail?.weakest,
-    });
-    if (this.repCounts[player] % 5 === 0)
+    this.scores[player]++;
+    this.emit("REP_COMPLETED", timestamp, player);
+    if (this.scores[player] % 5 === 0)
       this.emit("MILESTONE", timestamp, player);
+    if (
+      !this.halfway.has(player) &&
+      this.scores[player] >= Math.ceil(this.goal / 2)
+    ) {
+      this.halfway.add(player);
+      this.emit("HALFWAY_TO_GOAL", timestamp, player);
+    }
     if (this.scores.length === 2) {
       const next = Math.sign(this.scores[0] - this.scores[1]);
       if (next === 0) this.emit("SCORE_TIED", timestamp);
       else if (next !== previous)
         this.emit("PLAYER_TAKES_LEAD", timestamp, next > 0 ? 0 : 1);
     }
+    if (this.scores[player] >= this.goal) {
+      this.state = "complete";
+      this.winner = player;
+      this.emit("MATCH_FINISHED", timestamp, player);
+    }
   }
   reset() {
     this.state = "idle";
     this.scores = this.players.map(() => 0);
-    this.repCounts = this.players.map(() => 0);
-    this.formSums = this.players.map(() => 0);
     this.events = [];
-    this.remaining = this.duration;
     this.winner = null;
-    this.paused = false;
-    this.half = false;
-    this.finalTen = false;
-    this.startedAt = this.lastTime = this.pausedTotal = this.pauseStarted = 0;
+    this.halfway.clear();
+    this.lastTime = 0;
   }
 }
 /** Normalized, explicitly synthetic body fixture shared by demo and tests. */
