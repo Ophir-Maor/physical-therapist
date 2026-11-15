@@ -9,7 +9,7 @@ const schema = z
     exercise: z.string().trim().min(1).max(40),
     name: z.string().trim().min(1).max(24),
     repNumber: z.number().int().min(0).max(200),
-    goal: z.number().int().min(1).max(20),
+    goal: z.number().int().min(1).max(99),
     recentQualities: z.array(z.number().min(0).max(100)).max(8),
     average: z.number().min(0).max(100).nullable(),
     trend: z.enum(["up", "down", "flat", "unknown"]),

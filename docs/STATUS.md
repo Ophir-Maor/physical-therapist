@@ -26,7 +26,7 @@ Open http://localhost:3000. `http://127.0.0.1:3000` is also allowed in dev (`all
 - **Quality board** opens `/leaderboard`, ranked by average form quality.
 - Demo Mode needs neither a camera nor API keys. Live webcam is requested only after the user chooses it and continues.
 - The landing page’s right-hand “GO BIG” illustration is replaced by the live championship board for the selected exercise and challenge. It uses the same `/api/leaderboard` top 10, and **Open full board** keeps that category.
-- Guided Coach setup uses dropdowns for coach and challenge. Exercise, player count, and scored-rep count stay as buttons. The selected coach and challenge each keep one line of detail.
+- Guided Coach setup uses dropdowns for coach and challenge. Exercise and player count stay as buttons. Scored reps are a 1–99 number box with up and down controls and the words “quality reps” beside it. The default is 4. The selected coach and challenge each keep one line of detail. The Hear intro button sits 28px above the challenge title. Dropdowns do not keep the lime focus outline after a choice is clicked.
 - The merge of `origin` into `Sean` kept the teammate Session Results layout in `src/components/coach-flow.tsx`. Two players get a win, even-set, or stopped heading plus a score-per-rep table. A solo session keeps “Session results”, the quality report, the coaching cue, and the recap. Championship board still uses the outlined Progress button style and opens `/leaderboard`.
 
 Real voice is configured in gitignored `.env.local` (`ELEVENLABS_API_KEY`; voice IDs stay on the built-in Sarah, Callum, Charlie, and River presets unless overridden). Restart Next.js after any env change. On November 14, after adding the key and restarting, short speech requests for supportive, drill, hype, and calm each returned HTTP 200 `audio/mpeg`. Playback through the speakers was not checked. The key is not in client code, docs, or git. Missing credentials or an upstream failure use labeled browser speech and captions. Camera frames never leave the browser. Only the commentary sentence and personality name are sent to ElevenLabs.
@@ -88,7 +88,7 @@ Live two-player arcade matches use this registration before **Start match**. Dem
 
 `GET /api/leaderboard` returns at most 10 rows for one comparable category. Both coached challenge boards rank average quality, then consistency, then earlier `created_at`, and only include rows tagged `form-v1`. Arcade ranks counted reps on one board per exercise, with no duration filter. Coach boards require only the same exercise and challenge; repetition goal, completed rep count, and calibrated target are not board filters.
 
-The page at `/leaderboard` is linked from the landing header, arcade setup, arcade results, and Guided Coach setup and results. It polls periodically while the tab is visible, and **Refresh** loads immediately. Changing exercise or challenge updates that category only.
+The page at `/leaderboard` is linked from the home-page board, arcade setup, arcade results, and Guided Coach setup and results. The top-right header link is removed. It polls periodically while the tab is visible, and **Refresh** loads immediately. Changing exercise or challenge updates that category only.
 
 ### Championship categories
 

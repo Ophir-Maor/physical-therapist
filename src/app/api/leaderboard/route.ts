@@ -23,7 +23,7 @@ const schema = z
     reps: z.number().int().min(0).max(200),
     target: z.number().min(0).max(180).nullable(),
     durationSec: z.number().int().min(0).max(600),
-    goalReps: z.number().int().min(1).max(50).nullable().optional(),
+    goalReps: z.number().int().min(1).max(99).nullable().optional(),
     consistency: z.number().min(0).max(100).nullable().optional(),
     submissionKey: z.string().uuid(),
     consent: z.literal(true),
