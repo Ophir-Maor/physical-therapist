@@ -105,12 +105,10 @@ const avatarCanTrack = (pose: Landmark[] | null, exercise: ExerciseId) => {
 
 export default function CoachFlow({
   onExit,
-  onArcade,
   initialStep = "setup",
   initialPersonality = "supportive",
 }: {
   onExit: () => void;
-  onArcade: () => void;
   initialStep?: "setup" | "progress";
   initialPersonality?: CoachId;
 }) {
@@ -859,9 +857,6 @@ export default function CoachFlow({
               <div className="coach-actions">
                 <button className="primary" onClick={enterDemoStep}>
                   Continue to demonstration <ArrowRight size={18} />
-                </button>
-                <button className="secondary" onClick={onArcade}>
-                  Switch to arcade
                 </button>
               </div>
             </div>

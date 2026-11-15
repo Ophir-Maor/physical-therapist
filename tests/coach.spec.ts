@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("guided demo scores control and keeps arcade available", async ({ page }) => {
+test("guided demo scores control", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
@@ -8,7 +8,7 @@ test("guided demo scores control and keeps arcade available", async ({ page }) =
     page.getByRole("button", { name: /Hear Sarah.*introduce themselves/i }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Start Training" }).click();
-  await expect(page.getByLabel("Scored reps")).toHaveValue("4");
+  await expect(page.getByRole("spinbutton", { name: "Scored reps" })).toHaveValue("4");
   await page.getByRole("button", { name: "Continue to demonstration" }).click();
   await expect(page.getByLabel("Animated skeleton demonstrating the exercise")).toBeVisible();
   await page.getByRole("button", { name: "Enter coach demo" }).click();
@@ -36,7 +36,7 @@ test("guided demo scores control and keeps arcade available", async ({ page }) =
   const scores = await repTable.getByRole("cell").allTextContents();
   expect(scores.some((score) => /^\d+$/.test(score.trim()))).toBe(true);
   await page.getByRole("button", { name: "Everyday League home" }).click();
-  await page.getByRole("button", { name: "Arcade Championship" }).click();
-  await expect(page.getByRole("button", { name: "Enter Demo Arena" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Arcade Championship" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Jumping jacks" })).toHaveCount(0);
   expect(errors).toEqual([]);
 });
