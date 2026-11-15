@@ -42,11 +42,7 @@ export default function Home() {
             <Zap size={22} fill="currentColor" />
           </span>
           EVERYDAY<span className="brand-light">LEAGUE</span>
-          <span className="brand-dot">®</span>
         </button>
-        <div className="header-right">
-          <span className="edition">THE EXTRAORDINARILY ORDINARY</span>
-        </div>
       </header>
       {phase === "landing" && (
         <>
@@ -75,7 +71,7 @@ export default function Home() {
                   Start Training <ArrowRight size={19} />
                 </button>
                 <button
-                  className="text-button"
+                  className="home-progress"
                   onClick={() => {
                     setCoachStep("progress");
                     setPhase("coach");
@@ -83,9 +79,6 @@ export default function Home() {
                 >
                   Progress
                 </button>
-                <a className="text-button" href="/leaderboard">
-                  Quality board
-                </a>
               </div>
               <div className="choice-row hero-coaches">
                 {COACHES.map((coach) => (
@@ -101,7 +94,6 @@ export default function Home() {
                       }}
                     >
                       <strong>{coach.name}</strong>
-                      <small>{coach.detail}</small>
                     </button>
                     <button
                       type="button"

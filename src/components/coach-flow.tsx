@@ -29,6 +29,15 @@ import {
 } from "@/lib/form";
 import { IdentityRegistrar } from "@/lib/identity";
 import {
+  builtInWorkouts,
+  localNextWorkouts,
+  readShownWorkouts,
+  replaceShownWorkouts,
+  sectionsFromReps,
+  type NextWorkout,
+  type SectionScores,
+} from "@/lib/next-workout";
+import {
   applyRep,
   applyTracking,
   completeSession,
@@ -47,7 +56,7 @@ import {
   type SessionRecord,
 } from "@/lib/progress";
 
-type Step = "setup" | "demo" | "arena" | "results" | "progress";
+type Step = "setup" | "demo" | "arena" | "recommend" | "results" | "progress";
 type Arena = "register" | "calibrate" | "countdown" | "active" | "paused" | "handoff";
 type AvatarSnapshot = {
   pose: Landmark[] | null;
@@ -65,6 +74,7 @@ type Settings = {
   goal: number;
   demo: boolean;
   scale: number;
+  age: number | null;
 };
 
 const PHASES: PhaseName[] = [
@@ -84,6 +94,7 @@ const initial: Settings = {
   goal: 4,
   demo: true,
   scale: 1,
+  age: null,
 };
 
 const emptyAvatar = (): AvatarSnapshot => ({
@@ -150,9 +161,13 @@ export default function CoachFlow({
     suggestion: string | null;
     strongest: string | null;
     improvement: number | null;
+    sections: SectionScores;
     repScores: Array<Array<number | null>>;
   } | null>(null);
   const [history, setHistory] = useState<SessionRecord[]>(() => loadSessions());
+  const [nextWorkouts, setNextWorkouts] = useState<NextWorkout[]>([]);
+  const [nextSource, setNextSource] = useState<"gemini" | "local" | "checking" | null>(null);
+  const [ageDraft, setAgeDraft] = useState("");
   const settingsRef = useRef(settings);
   const arenaRef = useRef(arena);
   const voice = useRef<BroadcastVoice | null>(null);
@@ -182,6 +197,51 @@ export default function CoachFlow({
     voice.current = new BroadcastVoice(setCaption, setVoiceStatus);
     return () => voice.current?.stop();
   }, []);
+  useEffect(() => {
+    if (step !== "recommend" || !summary) return;
+    const exercise = summary.record.exercise === "squats" ? "squats" : "arm-raises";
+    if (settings.age == null) {
+      setNextWorkouts(builtInWorkouts());
+      setNextSource("local");
+      return;
+    }
+    const age = settings.age;
+    const avoid = readShownWorkouts();
+    const fallback = localNextWorkouts(exercise, summary.sections, age, avoid);
+    const controller = new AbortController();
+    setNextWorkouts(fallback);
+    setNextSource("checking");
+    void (async () => {
+      try {
+        const response = await fetch("/api/recommend", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            exercise,
+            age,
+            sections: summary.sections,
+            avoid,
+          }),
+          signal: controller.signal,
+        });
+        const body = (await response.json()) as {
+          workouts?: NextWorkout[];
+          source?: "gemini" | "local";
+        };
+        if (controller.signal.aborted) return;
+        const workouts = body.workouts?.length ? body.workouts : fallback;
+        setNextWorkouts(workouts);
+        setNextSource(body.workouts?.length && body.source === "gemini" ? "gemini" : "local");
+        replaceShownWorkouts(workouts.map((workout) => workout.title));
+      } catch {
+        if (controller.signal.aborted) return;
+        setNextWorkouts(fallback);
+        setNextSource("local");
+        replaceShownWorkouts(fallback.map((workout) => workout.title));
+      }
+    })();
+    return () => controller.abort();
+  }, [step, summary, settings.age]);
   useEffect(() => {
     if (arena !== "countdown") return;
     let count = 3;
@@ -290,6 +350,7 @@ export default function CoachFlow({
       suggestion: report.suggestion,
       strongest: report.strongestLabel,
       improvement: report.improvement,
+      sections: sectionsFromReps(reps.current[player] ?? []),
       repScores: reps.current.slice(0, current.players).map((list) =>
         list.map((rep) => (rep.scored ? rep.quality : null)),
       ),
@@ -303,7 +364,7 @@ export default function CoachFlow({
     );
     arenaRef.current = "paused";
     setArena("paused");
-    setStep("results");
+    setStep("recommend");
   }, []);
 
   const onVisionStatus = useCallback((message: string, isReady: boolean) => {
@@ -498,6 +559,13 @@ export default function CoachFlow({
     [finish],
   );
 
+  function changeAge(value: string) {
+    const digits = value.replace(/\D/g, "").slice(0, 2);
+    setAgeDraft(digits);
+    const next = Number(digits);
+    const age = digits.length === 2 && next >= 10 && next <= 99 ? next : null;
+    setSettings((current) => (current.age === age ? current : { ...current, age }));
+  }
   function cleanSettings(next: Settings): Settings {
     return {
       ...next,
@@ -602,6 +670,37 @@ export default function CoachFlow({
     const id = window.setTimeout(() => startSecondAthlete(), 600);
     return () => window.clearTimeout(id);
   }, [arena, settings.demo]);
+  function recalibrate() {
+    const index = turnRef.current;
+    const next = settingsRef.current;
+    const calibrationTarget = next.exercise === "arm-raises" ? 160 : 80;
+    evaluators.current[index] = new FormEvaluator(next.exercise, {
+      mode: "calibrate",
+      target: calibrationTarget,
+    });
+    calibrators.current[index] = new RangeCalibrator();
+    setPeaks((previous) => previous.map((peak, place) => (place === index ? null : peak)));
+    const chosen = [...targetsRef.current];
+    chosen[index] = null;
+    targetsRef.current = chosen;
+    setTargets(chosen);
+    reps.current[index] = [];
+    setCounts((previous) => previous.map((count, place) => (place === index ? 0 : count)));
+    setLastScores((previous) => previous.map((score, place) => (place === index ? null : score)));
+    setAverages((previous) => previous.map((score, place) => (place === index ? null : score)));
+    setMetrics([]);
+    sessions.current[index] = createSession({
+      exercise: next.exercise,
+      personality: next.personality,
+      name: next.names[index] || next.names[0],
+      goal: next.goal,
+    });
+    setCue(
+      "Do one or two slow, comfortable repetitions. This sets your target, not a medical maximum.",
+    );
+    arenaRef.current = "calibrate";
+    setArena("calibrate");
+  }
   function acceptTarget(fallback: boolean) {
     const index = turnRef.current;
     const measured = calibrators.current[index]?.target(settings.scale);
@@ -736,6 +835,18 @@ export default function CoachFlow({
                   />
                 </label>
               )}
+              <label className="field-label">
+                Age
+                <input
+                  aria-label="Age"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={2}
+                  placeholder="10–99"
+                  value={ageDraft}
+                  onChange={(event) => changeAge(event.target.value)}
+                />
+              </label>
             </div>
             <div className="panel settings">
               <label className="field-label">
@@ -757,9 +868,6 @@ export default function CoachFlow({
                   ))}
                 </select>
               </label>
-              <p className="dropdown-detail">
-                {COACHES.find((coach) => coach.id === settings.personality)?.detail}
-              </p>
               <button
                 type="button"
                 className="secondary coach-preview"
@@ -796,9 +904,6 @@ export default function CoachFlow({
                   ))}
                 </select>
               </label>
-              <p className="dropdown-detail">
-                {CHALLENGES.find((challenge) => challenge.id === settings.challenge)?.detail}
-              </p>
               <label className="field-label">05 / SCORED REPS</label>
               <div className="rep-stepper">
                 <div className="rep-stepper-box">
@@ -849,11 +954,6 @@ export default function CoachFlow({
                 </div>
                 <span>quality reps</span>
               </div>
-              <p className="disclaimer">
-                Experimental movement coaching, not a medical device. It does
-                not diagnose injuries, prescribe rehab, or measure clinical
-                recovery. Stop if you feel pain.
-              </p>
               <div className="coach-actions">
                 <button className="primary" onClick={enterDemoStep}>
                   Continue to demonstration <ArrowRight size={18} />
@@ -873,44 +973,44 @@ export default function CoachFlow({
           <div className="split-demo">
             <ExerciseDemo exercise={settings.exercise} />
             <div className="panel">
-              <p>{guide.summary}</p>
-              <p>
-                <b>Focus:</b> {guide.areas}
-              </p>
-              <p>
-                <b>Start:</b> {guide.start}
-              </p>
-              <p>
-                <b>Pattern:</b> {guide.pattern}
-              </p>
-              <ul>
-                {guide.steps.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-              <p>
-                <b>Visible misses:</b> {guide.mistakes.join(" · ")}
-              </p>
-              <p>{guide.camera}</p>
-              <div className="option-row">
-                <label>
-                  <input
-                    type="radio"
-                    name="coach-source"
-                    checked={settings.demo}
-                    onChange={() => setSettings({ ...settings, demo: true })}
-                  />{" "}
-                  Demo Mode
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    name="coach-source"
-                    checked={!settings.demo}
-                    onChange={() => setSettings({ ...settings, demo: false })}
-                  />{" "}
-                  Live webcam
-                </label>
+              <div className="pattern-notes">
+                <p>
+                  <b>Focus:</b> {guide.areas}
+                </p>
+                <p>
+                  <b>Start:</b> {guide.start}
+                </p>
+                <ul>
+                  {guide.steps.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+                <div className="pattern-misses">
+                  <p>
+                    <b>Visible misses:</b>
+                  </p>
+                  <ul>
+                    {guide.mistakes.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              <div className="choice-row">
+                <button
+                  type="button"
+                  className={`choice ${settings.demo ? "selected" : ""}`}
+                  onClick={() => setSettings({ ...settings, demo: true })}
+                >
+                  <strong>Demo Mode</strong>
+                </button>
+                <button
+                  type="button"
+                  className={`choice ${settings.demo ? "" : "selected"}`}
+                  onClick={() => setSettings({ ...settings, demo: false })}
+                >
+                  <strong>Live webcam</strong>
+                </button>
               </div>
               <button className="primary" onClick={enterArena}>
                 {settings.demo ? "Enter coach demo" : "Enable coach camera"}{" "}
@@ -1070,23 +1170,6 @@ export default function CoachFlow({
                       ? `${settings.names[turn]}: still watching`
                       : `${settings.names[turn]}: about ${Math.round(peaks[turn]!)}° observed`}
                   </p>
-                  <label className="field-label">
-                    Use {Math.round(settings.scale * 100)}% of the range you
-                    just showed
-                    <input
-                      aria-label="Target range"
-                      type="range"
-                      min={60}
-                      max={100}
-                      value={Math.round(settings.scale * 100)}
-                      onChange={(event) =>
-                        setSettings({
-                          ...settings,
-                          scale: Number(event.target.value) / 100,
-                        })
-                      }
-                    />
-                  </label>
                   <small>
                     This is a target chosen from what the camera could see. It
                     is not a diagnosis or a required maximum.
@@ -1098,6 +1181,13 @@ export default function CoachFlow({
                       onClick={() => acceptTarget(false)}
                     >
                       Accept target
+                    </button>
+                    <button
+                      className="secondary"
+                      disabled={!measuredReady}
+                      onClick={recalibrate}
+                    >
+                      Recalibrate
                     </button>
                     <button
                       className="secondary"
@@ -1151,6 +1241,11 @@ export default function CoachFlow({
                     <Play size={16} /> Resume
                   </button>
                 ) : null}
+                {(arena === "active" || arena === "paused" || arena === "countdown") && (
+                  <button className="secondary" onClick={recalibrate}>
+                    Recalibrate
+                  </button>
+                )}
                 <button className="primary" onClick={() => finish("stop")}>
                   Stop session
                 </button>
@@ -1160,6 +1255,30 @@ export default function CoachFlow({
                 to push through it.
               </p>
             </aside>
+          </div>
+        </div>
+      )}
+      {step === "recommend" && summary && (
+        <div className="setup-wrap">
+          <div className="eyebrow">AFTER THIS SESSION</div>
+          <h2>Next workout</h2>
+          {settings.age != null && nextSource === "gemini" && (
+            <p className="muted">
+              Gemini suggested these from the section scores and age {settings.age}.
+            </p>
+          )}
+          <div className="choice-row next-workouts">
+            {nextWorkouts.map((workout, index) => (
+              <div key={`${settings.age}-${workout.title}-${index}`} className="choice">
+                <strong>{workout.title}</strong>
+                <small>{workout.reason}</small>
+              </div>
+            ))}
+          </div>
+          <div className="result-actions">
+            <button className="primary" onClick={() => setStep("results")}>
+              See Results
+            </button>
           </div>
         </div>
       )}
@@ -1178,7 +1297,7 @@ export default function CoachFlow({
               <div className="eyebrow">
                 {summary.record.demo ? "DEMO SESSION · " : ""}QUALITY REPORT
               </div>
-              <h2>Session results</h2>
+              <h2>Session Results</h2>
               <p className="result-subtitle">{summary.reason}</p>
             </>
           )}
@@ -1229,39 +1348,6 @@ export default function CoachFlow({
               </table>
             ))}
           </div>
-          {summary.record.names.length < 2 && (
-            <div className="recap panel">
-              <p>{cue}</p>
-              <p>
-                Average {averages[summary.winner ?? 0] ?? "unscored"}. Scored reps{" "}
-                {summary.record.reps[summary.winner ?? 0] || 0}. Consistency{" "}
-                {summary.consistencies[summary.winner ?? 0] ?? "not enough reps"}.
-                {summary.improvement == null
-                  ? ""
-                  : ` Change across the set: ${summary.improvement > 0 ? "+" : ""}${summary.improvement}.`}
-              </p>
-              {summary.strongest && <p>Strongest measure: {summary.strongest}.</p>}
-              {summary.suggestion && <p>Next time: {summary.suggestion}</p>}
-              {summary.best.improved && (
-                <p>Personal best. This beat your previous comparable session.</p>
-              )}
-              {summary.best.comparableCount === 0 &&
-                summary.record.challenge === "personal-best" && (
-                  <p>
-                    No earlier session on this device used the same exercise,
-                    challenge, and target. This one becomes the baseline.
-                  </p>
-                )}
-              <div className="badge-row">
-                {summary.badges.map((badge) => (
-                  <span key={badge.id}>
-                    <b>{badge.title}</b>
-                    {badge.detail}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
           <LeaderboardSubmit
             demo={summary.record.demo}
             experience="coach"
@@ -1286,10 +1372,15 @@ export default function CoachFlow({
             suggestedName={
               summary.record.names[summary.winner ?? 0] || summary.record.names[0]
             }
+            companion={
+              <button className="primary" onClick={enterArena}>
+                Practice again
+              </button>
+            }
           />
           <div className="result-actions">
-            <button className="primary" onClick={enterArena}>
-              Practice again
+            <button className="secondary" onClick={() => setStep("setup")}>
+              Exit
             </button>
             <button className="secondary" onClick={() => setStep("progress")}>
               Progress
@@ -1332,7 +1423,7 @@ export default function CoachFlow({
               </article>
             ))}
           </div>
-          <button className="primary" onClick={() => setStep("setup")}>
+          <button className="primary progress-start" onClick={() => setStep("setup")}>
             Start a coached session
           </button>
         </div>
