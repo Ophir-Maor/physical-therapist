@@ -8,7 +8,7 @@ Keep Demo Mode ready. Say out loud that movement scores are experimental and are
 
 ## 0:00–0:25 — Two modes
 
-Open the landing page. Point at **Start Broadcasting** for the timed championship, then click **Guided Coach**. The camera stays on the device.
+Open the landing page. Point at **Start Broadcasting** for the rep-goal championship, then click **Guided Coach**. The camera stays on the device.
 
 ## 0:25–1:10 — Guided demo, no camera
 
@@ -24,7 +24,7 @@ If the camera fails, return to Demo Mode. Do not present synthetic skeletons as 
 
 ## 2:10–2:40 — Arcade, still here
 
-From the landing page, choose **Start Broadcasting**, a 15-second jumping-jack demo, and **Enter Demo Arena**. The original rep counter, clock, and announcer are unchanged. For a live two-player arcade match, register one person at a time and stay in lanes.
+From the landing page, choose **Start Broadcasting**, a first-to-5 jumping-jack demo, and **Enter Demo Arena**. The match ends when an athlete reaches the repetition goal. For a live two-player arcade match, register one person at a time and stay in lanes.
 
 ## 2:40–3:00 — Close
 

@@ -4,12 +4,9 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import {
   ACTIVITIES,
-  ARCADE_DURATIONS,
   CHALLENGE_LABELS,
-  COACH_GOALS,
   activityKey,
   findActivity,
-  type Activity,
   type BoardChallenge,
 } from "@/lib/boards";
 
@@ -32,14 +29,6 @@ type Payload = {
   tieBreak?: string;
   place?: { rank: number | null; inTop10: boolean } | null;
 };
-
-function nearestTarget(activity: Activity, requested: number | null) {
-  if (!activity.targets.length) return null;
-  if (requested == null) return activity.targets[0];
-  return activity.targets.reduce((best, target) =>
-    Math.abs(target - requested) < Math.abs(best - requested) ? target : best,
-  );
-}
 
 const listeners = new Set<() => void>();
 
@@ -65,20 +54,6 @@ export default function ChampionshipBoard() {
   const challenge = activity.challenges.includes(requestedChallenge as BoardChallenge)
     ? (requestedChallenge as BoardChallenge)
     : activity.challenges[0];
-  const requestedDuration = Number(params.get("duration"));
-  const duration = ARCADE_DURATIONS.includes(requestedDuration as 15 | 30 | 60)
-    ? (requestedDuration as 15 | 30 | 60)
-    : 30;
-  const requestedGoal = Number(params.get("goal"));
-  const goal = COACH_GOALS.includes(requestedGoal as 4 | 6 | 8)
-    ? (requestedGoal as 4 | 6 | 8)
-    : 4;
-  const requestedTarget = Number(params.get("target"));
-  const target =
-    nearestTarget(
-      activity,
-      Number.isFinite(requestedTarget) && requestedTarget > 0 ? requestedTarget : null,
-    ) ?? activity.targets[0] ?? null;
   const submission = params.get("submission");
   const [data, setData] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -86,6 +61,9 @@ export default function ChampionshipBoard() {
 
   const update = (patch: Record<string, string>) => {
     const next = new URLSearchParams(window.location.search);
+    next.delete("target");
+    next.delete("goal");
+    next.delete("duration");
     if (!next.get("exercise")) {
       next.set("exercise", activity.exercise);
       next.set("experience", activity.experience);
@@ -101,11 +79,6 @@ export default function ChampionshipBoard() {
       experience: activity.experience,
       challenge,
     });
-    if (activity.experience === "arcade") params.set("duration", String(duration));
-    else {
-      params.set("goal", String(goal));
-      if (target != null) params.set("target", String(target));
-    }
     if (submission) params.set("submission", submission);
     setLoading(true);
     setError("");
@@ -123,7 +96,7 @@ export default function ChampionshipBoard() {
     } finally {
       setLoading(false);
     }
-  }, [activity, challenge, duration, goal, target, submission]);
+  }, [activity, challenge, submission]);
 
   useEffect(() => {
     const handle = window.setTimeout(() => void load(), 120);
@@ -138,9 +111,9 @@ export default function ChampionshipBoard() {
   }, [load]);
 
   const entries = data?.entries ?? [];
-  const unit = data?.unit || (challenge === "timed" ? "reps" : challenge === "consistency" ? "consistency" : "quality points");
+  const unit = data?.unit || (challenge === "reps" ? "reps" : "average quality");
   const scoreOf = (entry: Entry) =>
-    challenge === "timed" ? entry.reps : challenge === "consistency" ? entry.consistency : entry.average;
+    challenge === "reps" ? entry.reps : entry.average;
   const outside =
     submission && data?.place && data.place.rank != null && !data.place.inTop10
       ? data.place.rank
@@ -205,53 +178,6 @@ export default function ChampionshipBoard() {
               ))}
             </select>
           </label>
-          {activity.experience === "arcade" ? (
-            <label>
-              Duration
-              <select
-                aria-label="Duration"
-                value={duration}
-                onChange={(event) => update({ duration: event.target.value })}
-              >
-                {ARCADE_DURATIONS.map((item) => (
-                  <option key={item} value={item}>
-                    {item} seconds
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : (
-            <>
-              <label>
-                Repetition goal
-                <select
-                  aria-label="Repetition goal"
-                  value={goal}
-                  onChange={(event) => update({ goal: event.target.value })}
-                >
-                  {COACH_GOALS.map((item) => (
-                    <option key={item} value={item}>
-                      {item} quality reps
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Range target
-                <select
-                  aria-label="Range target"
-                  value={nearestTarget(activity, target) ?? ""}
-                  onChange={(event) => update({ target: event.target.value })}
-                >
-                  {activity.targets.map((item) => (
-                    <option key={item} value={item}>
-                      about {item}°
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </>
-          )}
           <button className="secondary" type="button" onClick={() => void load()}>
             Refresh
           </button>
@@ -259,8 +185,8 @@ export default function ChampionshipBoard() {
         <p className="champ-unit">
           Ranking unit: <b>{unit}</b>
           {activity.experience === "arcade"
-            ? ` · ${activity.label} · ${duration}s`
-            : ` · ${activity.label} · ${goal} reps · about ${nearestTarget(activity, target)}°`}
+            ? ` · ${activity.label}`
+            : ` · ${activity.label}`}
         </p>
         {outside && (
           <p className="board-note" role="status">

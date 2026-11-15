@@ -10,11 +10,11 @@ test("demo uses detector pipeline through results and restart", async ({
   );
   await page.screenshot({ path: "test-results/landing.png", fullPage: true });
   await page.getByRole("button", { name: "Arcade Championship" }).click();
-  await page.getByLabel("03 / MATCH LENGTH").selectOption("15");
+  await page.getByLabel("03 / REP GOAL").selectOption("5");
   await page.getByRole("button", { name: "Enter Demo Arena" }).click();
   await expect(page.getByRole("button", { name: "Start match" })).toBeEnabled();
   await page.getByRole("button", { name: "Start match" }).click();
-  await expect(page.getByText("ON THE CLOCK")).toBeVisible({ timeout: 6000 });
+  await expect(page.getByText("RACE TO THE TARGET")).toBeVisible({ timeout: 6000 });
   await page.waitForTimeout(5000);
   await page.screenshot({ path: "test-results/broadcast.png", fullPage: true });
   await expect(
@@ -26,7 +26,7 @@ test("demo uses detector pipeline through results and restart", async ({
   await page.screenshot({ path: "test-results/results.png", fullPage: true });
   await page.getByRole("button", { name: "Run it back" }).click();
   await expect(page.getByRole("button", { name: "Start match" })).toBeEnabled();
-  await expect(page.locator(".player b").first()).toHaveText("0.0");
+  await expect(page.locator(".player b").first()).toHaveText("0");
   expect(errors).toEqual([]);
 });
 test("solo arm raise setup and narrow layout", async ({ page }) => {
@@ -35,7 +35,7 @@ test("solo arm raise setup and narrow layout", async ({ page }) => {
   await page.getByRole("button", { name: "Arcade Championship" }).click();
   await page.getByRole("button", { name: "Solo practice" }).click();
   await page.getByRole("button", { name: "Arm raises" }).click();
-  await page.getByLabel("03 / MATCH LENGTH").selectOption("15");
+  await page.getByLabel("03 / REP GOAL").selectOption("5");
   await page.getByRole("button", { name: "Enter Demo Arena" }).click();
   await expect(
     page.getByRole("heading", { name: "Arm Raise Championship" }),
@@ -47,7 +47,7 @@ test("solo arm raise setup and narrow layout", async ({ page }) => {
     ),
   ).toBe(true);
   await page.getByRole("button", { name: "Start match" }).click();
-  await expect(page.getByRole("heading", { name: "YOUR SCORE." })).toBeVisible({
+  await expect(page.getByRole("heading", { name: /WINS\./ })).toBeVisible({
     timeout: 25000,
   });
   await expect(page.locator(".final-scores b")).not.toHaveText("0");

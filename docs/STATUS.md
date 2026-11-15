@@ -6,7 +6,7 @@ This is a movement-coaching prototype. It is not a medical device, does not diag
 
 ## Critical restrictions
 
-- Git exists in this directory. Branch `feature/gamified-coaching` tracks `origin/feature/gamified-coaching`. The coaching commit `87230c5` is already on GitHub. The later ElevenLabs voice work is **uncommitted**. Do not commit, push, force-push, delete branches, or deploy unless the user explicitly asks.
+- Git exists in this directory. The current branch is `ophir`, tracking `origin/ophir`; it contains the guided-coaching, contextual voice, quality-leaderboard, rep-only arcade, and split-screen avatar work. Branch `feature/gamified-coaching` remains at `87230c5`. Do not commit, push, force-push, delete branches, or deploy unless the user explicitly asks.
 - `main` tracks `origin/main`. Do not overwrite that history.
 - Local implementation, dependency installation, servers, and testing are authorized.
 - Keep this file current at the end of subsequent work. Read `AGENTS.md` before continuing.
@@ -22,39 +22,21 @@ npm run dev
 Open http://localhost:3000. `http://127.0.0.1:3000` is also allowed in dev (`allowedDevOrigins`). Using the other host used to load the page with no JavaScript, so buttons did nothing. Hard-refresh after a dev-server restart.
 
 - **Start Training** opens Guided Coach: demonstration, calibration, form scoring, and one of four coaches.
-- **Arcade Championship** keeps the timed rep-count broadcast as a secondary mode.
+- **Arcade Championship** is a first-to-5, 10, or 15 rep-count broadcast as a secondary mode.
 - **Quality board** opens `/leaderboard`, ranked by average form quality.
 - Demo Mode needs neither a camera nor API keys. Live webcam is requested only after the user chooses it and continues.
 
 Real voice is configured in gitignored `.env.local` (`ELEVENLABS_API_KEY` plus one voice ID per personality). Restart Next.js after any env change. The key is not in client code, docs, or git. Missing credentials or an upstream failure use labeled browser speech and captions. Camera frames never leave the browser. Only the commentary sentence and personality name are sent to ElevenLabs.
 
-Shared board: quality rankings are the primary board. A coach row ranks by average form quality, then consistency, then earlier submission. It must match the exercise, the 4/6/8 repetition goal, a target within 10%, and scoring version `form-v1`. `db/migrations/002_scoring_version.sql` adds nullable `scoring_version`. Older rows with a null version stay in the table and are not mixed into that board. Arcade 15/30/60 rankings remain available from the same page by choosing a timed exercise. Demo Mode cannot be posted.
-
-## Broadcast scoring — November 14, later session
-
-Arcade matches now score form instead of adding 1 per rep. Guided Coach is unchanged.
-
-- Each completed open-and-close is worth `1 + form/100` (perfect = 2). The higher total wins.
-- Form is 50 open, 35 return, and up to 15 for an upright torso. Jumping jacks split the open and the return evenly between arms and feet. The lower wrist caps the arm score. A barely legal rep is about 40 form (1.4 points). Full range is 100.
-- A brief landmark blink still counts, graded from the smoothed peak. Leaving the frame for about half a second pauses the clock and scoring for both players until both are fully back.
-- The broadcast screen keeps its layout and adds live arm and foot meters, a best-this-attempt mark, a rep flash (`1.4 · feet`), and a scoreboard line with total, reps, and average form. The announcer says the form average only in the final call.
-- Arcade arm raises now need shoulders, hands, and hips before Start match. Coach arm raises still need shoulders and hands.
-- Arm raises lose up to 30 form points when the lift and lower finish in 600 ms or less. The flash can read `pace`. A raise of 1.2 seconds or longer keeps the pace points. Jumping jacks are not paced.
-- Solo practice results say "YOUR SCORE." and the final call says "Your score is …". Head-to-head matches still name a winner. Two-player ties still say "SHARED GLORY."
-- During an arm raise, the live view shows "Too fast", "Too slow", or "Pace good" on one line in its own box beside the points flash. Both slots stay reserved, so one box disappearing does not move the other. The arm meter box does not change height. Holding still does not show a pace warning.
-- After the camera has seen the required body, Start match stays clickable for 8 seconds if the player leans out to reach it. A click while they are out of frame waits, and the countdown starts when they step back in. Confirm keeps the last good registration pose for the same 8 seconds. The in-match pause banner does not capture clicks. Leaving the frame during a match still pauses the clock.
-
-Verification this session:
-
-- `npx vitest run`: 53 tests passed across 7 files. `src/app/api/leaderboard/route.test.ts` did not run because `@neondatabase/serverless` is not installed.
-- `npx eslint` passed on the broadcast scoring files. `npx tsc --noEmit` reports only the missing Neon module in `src/app/api/leaderboard/route.ts`.
-- Browser, Demo Mode, 15-second jumping jacks: both players scored perfect 2-point reps (for example Alex 10.0 from 5 reps, Jordan 6.0 from 3). The results screen showed the point total, rep count, and form 100, labeled synthetic. The final announcer line was “Alex wins, 5 reps, form 100.” Live meters followed the pose and kept a lime mark at the best of the attempt. A 390px-wide viewport had no horizontal overflow on the results screen or during a live match. The shared pause was not triggered in the browser because the synthetic athletes never leave the frame; the pause behavior is covered by the engine unit test. No physical webcam pass was done.
-- Start-button hold: `npx vitest run src/lib/identity.test.ts` passed 5 tests, including a lean-out confirm. Demo Mode still enabled Start match and reached the countdown. The 8-second live-camera hold was not tried on a physical webcam.
-- Demo Mode arm raises: the speed box stays left of the points box and shows "Too fast" on one line. Each box's edge stayed fixed while the other appeared and disappeared. Synthetic poses only.
+Shared board: quality rankings are the primary board. A coach row ranks by the average quality across all scored repetitions, then consistency, then earlier submission. It must match only the exercise, challenge, and scoring version `form-v1`. Calibrated range, selected repetition goal, and completed repetition count are stored as context but do not select a board or affect rank. `db/migrations/002_scoring_version.sql` adds nullable `scoring_version`. Older rows with a null version stay in the table and are not mixed into that board. Arcade boards rank counted reps without duration categories. Demo Mode cannot be posted.
 
 ## What changed on November 14
 
 The arcade path is still the landing headline, `GameEngine`, `ActivityDetector`, `PlayerTracker`, and the original three Playwright journeys in `tests/broadcast.spec.ts`.
+
+### Optional coach introductions
+
+Each coach card on the landing page now has a separate, optional **Hear Sarah**, **Hear Callum**, **Hear Charlie**, or **Hear River** control. Listening does not select the coach or start training. The short introduction names the voice, matches the selected personality, includes the movement-safety reminder, and uses the existing ElevenLabs route with the labeled browser-speech fallback. The spoken caption and live/fallback voice status appear below the cards. The coach setup preview uses the same introduction and names the selected voice in its button label.
 
 ### Guided Movement Coach
 
@@ -66,7 +48,7 @@ Exercises: controlled arm raises, and conservative squats. Squats say explicitly
 
 Coaches: Supportive, Drill Sergeant (opt-in, and it tells the user to stop if they feel pain), Hype Commentator, Calm Instructor. Arcade personalities `hype`, `dry`, and `documentary` still work. Drill Sergeant is not the arcade default.
 
-Challenges: Practice, Form (highest average quality), Consistency (steadiness against that player's own target), Personal Best (only compared with similar on-device sessions). The timed arcade match remains separate.
+Challenges: Practice, Form (highest average quality), Consistency (steadiness against that player's own target), Personal Best (only compared with similar on-device sessions). The first-to-rep-goal arcade match remains separate.
 
 Pause, resume, and stop are on the coached session. Stopping is always available. Motivational copy does not tell anyone to push through pain.
 
@@ -97,26 +79,26 @@ Live two-player arcade matches use this registration before **Start match**. Dem
 
 `src/lib/demo-motion.ts` drives the coach demo. Player 1 is a slower controlled cycle. Player 2 is a faster, less even cycle. The same form engine scores both, and tests require the controlled average to win even with fewer repetitions.
 
-`src/lib/progress.ts` stores up to 30 sessions in `el-sessions` (exercise, time, coach, reps, qualities, average, consistency, target, duration, demo flag). Personal bests compare only coach sessions with the same exercise, challenge, demo flag, and a target within 10%. Achievements: Five Quality Reps, Smooth Operator, Consistency King, Personal Best, Comeback Champion. Arcade results still use `el-history` and also append a timed session record.
+`src/lib/progress.ts` stores up to 30 sessions in `el-sessions` (exercise, recorded date, coach, reps, qualities, average, consistency, target, internal session length, demo flag). Personal bests compare only coach sessions with the same exercise, challenge, demo flag, and a target within 10%. Achievements: Five Quality Reps, Smooth Operator, Consistency King, Personal Best, Comeback Champion. Arcade results still use `el-history` and also append a rep-goal session record.
 
-`POST /api/leaderboard` rejects synthetic sessions, validates nickname, score, consent, and challenge settings with Zod, and rate-limits per process (10 inserts a minute). It stores a public nickname, exercise, challenge, experience, rep count, duration or goal, target, average, and consistency. No poses, video, or skeletal landmarks. A submission key blocks a second insert of the same result. Practice and personal-best can be saved but are not championship categories.
+`POST /api/leaderboard` rejects synthetic sessions, validates nickname, score, consent, and challenge settings with Zod, and rate-limits per process (10 inserts a minute). It stores a public nickname, exercise, challenge, experience, rep count, selected goal metadata, target, average, and consistency. New arcade rows store no duration. No poses, video, or skeletal landmarks. A submission key blocks a second insert of the same result. Practice and personal-best can be saved but are not championship categories.
 
-`GET /api/leaderboard` returns at most 10 rows for one comparable category. The primary form board ranks average quality, then consistency, then earlier `created_at`, and only rows tagged `form-v1`. Arcade still ranks counted reps for 15, 30, or 60 seconds. Consistency-challenge boards still rank the consistency score. Coach boards require the goal and a range target within 10%.
+`GET /api/leaderboard` returns at most 10 rows for one comparable category. Both coached challenge boards rank average quality, then consistency, then earlier `created_at`, and only include rows tagged `form-v1`. Arcade ranks counted reps on one board per exercise, with no duration filter. Coach boards require only the same exercise and challenge; repetition goal, completed rep count, and calibrated target are not board filters.
 
-The page at `/leaderboard` is linked from the landing header, arcade setup, arcade results, and Guided Coach setup and results. It polls every 20 seconds while the tab is visible, and **Refresh** loads immediately. Changing exercise, challenge, or duration/goal updates that category only.
+The page at `/leaderboard` is linked from the landing header, arcade setup, arcade results, and Guided Coach setup and results. It polls periodically while the tab is visible, and **Refresh** loads immediately. Changing exercise or challenge updates that category only.
 
 ### Championship categories
 
 | Exercise | Challenge | Grouping | Rank |
 | --- | --- | --- | --- |
-| Jumping jacks | Arcade Championship | 15s, 30s, or 60s | Reps |
-| Arm raises | Arcade Championship | 15s, 30s, or 60s | Reps |
-| Controlled arm raises | Form | Goal 4, 6, or 8 and a range target near 45°, 60°, 75°, or 90° | Average quality |
-| Controlled arm raises | Consistency | Same goal and range | Consistency |
-| Controlled squats | Form | Goal 4, 6, or 8 and a range target near 25°, 35°, 45°, or 60° | Average quality |
-| Controlled squats | Consistency | Same goal and range | Consistency |
+| Jumping jacks | Arcade Championship | All submitted live rep-goal sets | Reps |
+| Arm raises | Arcade Championship | All submitted live rep-goal sets | Reps |
+| Controlled arm raises | Form | All submitted live sets | Average quality |
+| Controlled arm raises | Consistency | All submitted live sets | Average quality |
+| Controlled squats | Form | All submitted live sets | Average quality |
+| Controlled squats | Consistency | All submitted live sets | Average quality |
 
-Not public boards: Practice, Personal Best, Demo Mode, unknown durations, missing goals, missing consistency, and targets outside the 10% window. A live Neon read on November 14 found one existing production row: arcade arm raises, 15 seconds, 3 reps. It was not modified. Temporary verification rows were deleted by submission key.
+Not public boards: Practice, Personal Best, and Demo Mode. Legacy `timed` arcade rows remain stored but are excluded from the new `reps` boards. A live Neon read after simplifying coached categories found the existing `Ophir` controlled-arm-raise consistency result at rank 1 with average quality 80; its 4 completed reps, selected goal of 4, consistency 66, and target 172.5° remain metadata only. Temporary verification rows were deleted by submission key.
 
 ### How to check a top 10 locally
 
@@ -125,7 +107,7 @@ cd '/Users/alinamaor/Documents/SanD Hacks/everyday-league'
 npm run dev
 ```
 
-Open http://127.0.0.1:3000/leaderboard. The page opens on controlled arm raises, Form, 4 quality reps. Switch the exercise to arcade **Arm raises** and 15 seconds to see the existing production score. Other quality categories stay empty until a live, non-demo session is submitted.
+Open http://127.0.0.1:3000/leaderboard. The page opens on controlled arm raises and Form. Switch the exercise to arcade **Arm raises** to view its rep-count board. Legacy duration-based rows are intentionally not mixed into the new board. Other categories stay empty until a live, non-demo session is submitted.
 
 ## Coaching session context
 
@@ -146,37 +128,78 @@ ElevenLabs stays on `eleven_flash_v2_5`. One calm cue was also generated with `e
 - A live Neon insert/read still passes, and `scoring_version` exists on the production branch. Temporary rows were deleted.
 - No new webcam session was run. The optional LLM path was not called against a live model because no gateway or OpenAI key is configured.
 
+## Codex intake verification on November 14
+
+- Fetched `origin` and pruned stale refs. The clean current branch `ophir` matched `origin/ophir` exactly (0 ahead, 0 behind), and `git pull --ff-only origin ophir` reported already up to date. `origin/main` advanced to merge commit `e0cf608`; no merge into `ophir` was attempted.
+- Node `v24.22.3`, npm `11.19.1`, and all top-level dependencies were installed at the expected versions.
+- `npm run typecheck`, `npm run lint`, `npm test`, and `npm run build` passed. Vitest: 10 files and 64 tests passed. The credential-aware Neon round trip required network access and passed, including its temporary-row cleanup.
+- The first parallel Playwright run passed 4 of 6 tests; the arcade restart and guided-demo journeys timed out waiting for their results screens. Both failed journeys passed when rerun serially (`2 passed`), indicating timing/resource contention rather than a consistently reproducible failure.
+- `.env.local` is present and gitignored. ElevenLabs key/model/voice variables and Neon pooled/unpooled connection variables are non-empty. Values were not printed or modified. The ElevenLabs route configuration and Neon round-trip test were verified; no new audible browser playback or physical-webcam test was performed.
+- This intake changed only this status document. Application functionality, credentials, Git index/history, and remote branches were not modified.
+
+## Optional coach-introduction verification on November 14
+
+- `npm run typecheck`, `npm run lint`, `npm test`, and `npm run build` passed after the landing-page introduction controls were added. Vitest: 10 files and 64 tests passed, including distinct, named, safety-bounded introductions for all four personalities and the live Neon round trip.
+- `npx playwright test tests/coach.spec.ts --workers=1` passed. The journey verifies that the optional Sarah introduction control is present before entering Guided Coach, then completes the existing synthetic coached session.
+- No audible speaker-quality judgment or physical-webcam session was performed.
+
+## Target- and goal-independent leaderboard verification on November 14
+
+- The range-target and repetition-goal dropdowns were removed from `/leaderboard`. Coach boards are now selected only by exercise and Form or Consistency challenge.
+- Server top-ten and placement queries no longer filter `target_deg`, `goal_reps`, or completed `reps`. Those values remain stored and returned as session context, but they do not affect board membership, ordering, or placement.
+- Both coached challenges display and rank `average`, which `summarizeReps` computes across every scored repetition in the completed set. Consistency is only an equal-average tie-break.
+- `npm run typecheck`, `npm run lint`, and `npm test` passed. Vitest: 10 files and 64 tests passed, including a ranking test that combines different calibrated targets and the live Neon round trip.
+- `npx playwright test tests/leaderboard.spec.ts --workers=1` passed: 2 tests. The desktop test explicitly verifies that neither Range target nor Repetition goal is rendered; the phone layout still passes.
+- A live local API read of the controlled-arm-raise Consistency board returned `Ophir` at rank 1 with displayed average quality 80. Adding obsolete `goal=8` or `target=90` query parameters returns the same board and rank, confirming that neither value changes board selection.
+
+## Rep-only task verification on November 14
+
+- Arcade setup now offers first-to-5, 10, or 15 repetition goals. `GameEngine` completes immediately when one athlete reaches the selected goal; it has no duration, clock tick, buzzer, halftime, or final-seconds event.
+- The arcade scoreboard shows the repetition target instead of a clock. Guided Coach shows average quality without elapsed seconds. Countdown and monotonic detector timestamps remain implementation mechanics, not task or ranking criteria.
+- Arcade leaderboard rows use challenge `reps`, have no duration selector or query parameter, and share one board per exercise. New arcade submissions store a null database duration; legacy `timed` rows remain untouched and excluded.
+- `npm run typecheck`, `npm run lint`, and `npm test` passed: 64 tests. `npx playwright test --workers=1` passed all 6 browser tests, including the first-to-5 synthetic arcade completion and duration-free leaderboard.
+
+## Split-screen movement avatar on November 14
+
+- Guided Coach calibration and coached repetitions now place the camera and a movement avatar side by side. The avatar uses the same current MediaPipe landmark coordinates as the person rather than replaying a canned animation.
+- The live webcam preview is clean: the old coached ghost/pose guide is removed from that side. Demo Mode still shows its synthetic athlete because there is no camera person to display. Arcade is unchanged.
+- Controlled arm raises show target hand markers plus a live `Current …° · Stop at …°` readout. The avatar turns lime when the selected target is reached. More than 10% beyond the target turns the avatar and target red, raises a red alert, and says `TOO HIGH · LOWER SLIGHTLY`. Squats use the corresponding `TOO DEEP` correction.
+- Avatar mirroring is separate from evaluation. It continues during calibration, countdown, the active set, and pause, but only calibration and the active set feed `FormEvaluator`, so countdown and pause cannot add repetitions.
+- `npm run typecheck`, `npm run lint`, `npm test` (64 tests), and `npm run build` passed. The serial Guided Coach Playwright journey passed and explicitly verified the avatar during calibration plus the red overshoot state with a deliberately reduced demo target. The full six-test browser run passed five journeys; the leaderboard journey remained on its loading message for its five-second assertion, then both leaderboard tests passed immediately when rerun in isolation. This matches the existing external-data timing flake rather than an avatar failure.
+
 ## Known limitations
 
 1. Form scores are heuristics. They are not a clinical grade. Squats are the less reliable of the two exercises because a single webcam cannot see depth well. Alignment is withheld when both sides are not visible.
 2. Calibration uses the range the camera just saw. It does not know whether that range is medically appropriate.
 3. Live two-player identity is spatial. Crossing or standing on top of each other pauses scoring. Demo Mode does not prove live registration.
 4. Coach demo trajectories are deterministic scripts, not recorded humans. A higher demo score does not prove real-world accuracy.
-5. Pose inference stays on the main thread. The camera loop now targets about 12 frames per second at 640×480, and the demo loop about 30. The court background is cached, skeleton shadows are off, and scoreboard React updates happen when the score or displayed second changes rather than on every frame. A worker is still not used.
-6. The match and coach timers do not have a shared pause model. Arcade still has no pause. Coach pause freezes demo motion and stops feeding the evaluator; the clock subtracts paused time.
+5. Pose inference stays on the main thread. The camera loop targets about 12 frames per second at 640×480, and the demo loop about 30. The court background is cached, skeleton shadows are off, and scoreboard React updates happen only when scores change. A worker is still not used.
+6. Arcade still has no pause. Coach pause freezes demo motion and stops feeding the evaluator; internal timestamps exclude the paused interval from movement analysis and stored session metadata.
 7. Speech rate limiting, the audio cache, and the leaderboard limiter are process-local. There is no login. Browser-submitted scores can be forged. Do not treat the board as officiated.
 8. `npm audit` was not re-run. The previous handoff reported 7 moderate findings in the dev ESLint chain. Do not claim a clean audit.
 9. ElevenLabs voice wiring, Neon setup, and the championship leaderboard after `87230c5` are uncommitted. `.env.local` is gitignored and must stay that way.
 10. The public board is self-reported. Movement scoring still happens in the browser. There is no account and no server-side pose check.
 11. Optional model dialogue is implemented but not live-tested. This environment has no `OPENAI_API_KEY` or Neon AI Gateway token, so coaching speech is deterministic.
 12. `eleven_turbo_v2_5` returned audio faster than Flash on one short cue. It was not listened to, so it is not the default.
+13. The movement avatar mirrors detected 2D landmarks, not the person’s appearance or true 3D biomechanics. Clothing, occlusion, camera angle, and pose-model error can move it incorrectly. The red overshoot state is coaching feedback against the user-selected target, not a safety or medical warning.
 
 ## Next recommended steps
 
 1. Run `npm run test:e2e` on the demo machine, outside any sandbox, and watch the guided demo through results. Confirm the controlled athlete’s average is visibly higher than a two-player rushed demo.
-2. On a real camera, compare ten slow arm raises with the score, then try a deliberately fast set. Adjust thresholds only from those failures and add a fixture for each change.
+2. On a real camera, confirm the split-screen avatar tracks arms and legs without visible left/right reversal, then compare ten slow arm raises with the score and deliberately go slightly past the target. Confirm the avatar reaches lime before turning red. Adjust thresholds only from observed failures and add a fixture for each change.
 3. Repeat with a conservative squat. Expect more “unscored” results when feet or hips leave the frame.
 4. Register two people without crossing. Confirm preview-left stays player 1 after MediaPipe reorders poses.
-5. Restart the app and finish a **non-demo** session. On the results screen press **Submit to Leaderboard**, enter a nickname, check the public-sharing box, and submit. **View my ranking** opens the matching top 10. Demo Mode has no submit button. Open `/leaderboard` to switch exercise, challenge, and duration or repetition goal.
+5. Restart the app and finish a **non-demo** session. On the results screen press **Submit to Leaderboard**, enter a nickname, check the public-sharing box, and submit. **View my ranking** opens the matching top 10. Demo Mode has no submit button. Open `/leaderboard` to switch exercise or challenge.
 6. Commit and push only after the user asks. Do not deploy until they ask, and do not expose the TTS or leaderboard routes publicly without authentication.
 
 ## File map
 
 - `src/app/page.tsx`: arcade UI, live two-player registration, entry to coach and progress.
 - `src/components/coach-flow.tsx`: guided session, calibration, results.
+- `src/components/pose-avatar.tsx`: landmark-mirrored split-screen avatar, target markers, and correction states.
 - `src/components/exercise-demo.tsx`: original looping skeleton.
-- `src/components/vision-stage.tsx`: webcam, arcade demo, coach demo, ghost overlay.
-- `src/lib/engine.ts`: arcade detectors, lane tracker, timed match.
+- `src/components/vision-stage.tsx`: webcam, arcade demo, coach demo, and optional pose overlay.
+- `src/lib/engine.ts`: arcade detectors, lane tracker, rep-goal match.
 - `src/lib/form.ts`, `geometry.ts`: quality scoring and pose math.
 - `src/lib/identity.ts`: sequential registration.
 - `src/lib/demo-motion.ts`: controlled versus rushed synthetic motion.

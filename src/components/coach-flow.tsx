@@ -4,10 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight, ChevronLeft, Pause, Play } from "lucide-react";
 import ExerciseDemo from "@/components/exercise-demo";
 import LeaderboardSubmit from "@/components/leaderboard-submit";
+import PoseAvatar from "@/components/pose-avatar";
 import VisionStage from "@/components/vision-stage";
 import { BroadcastVoice, coachCommentary } from "@/lib/commentary";
 import { requestCoachLine } from "@/lib/coach-client";
-import { ghostFrame } from "@/lib/demo-motion";
 import { PlayerTracker, type Landmark } from "@/lib/engine";
 import {
   CHALLENGES,
@@ -49,6 +49,13 @@ import {
 
 type Step = "setup" | "demo" | "arena" | "results" | "progress";
 type Arena = "register" | "calibrate" | "countdown" | "active" | "paused";
+type AvatarSnapshot = {
+  pose: Landmark[] | null;
+  tracking: boolean;
+  progress: number;
+  pastTarget: boolean;
+  phase: PhaseName;
+};
 type Settings = {
   exercise: ExerciseId;
   players: 1 | 2;
@@ -77,6 +84,23 @@ const initial: Settings = {
   goal: 4,
   demo: true,
   scale: 1,
+};
+
+const emptyAvatar = (): AvatarSnapshot => ({
+  pose: null,
+  tracking: false,
+  progress: 0,
+  pastTarget: false,
+  phase: "preparing",
+});
+
+const avatarCanTrack = (pose: Landmark[] | null, exercise: ExerciseId) => {
+  if (!pose) return false;
+  const required =
+    exercise === "squats"
+      ? [23, 24, 25, 26, 27, 28]
+      : [11, 12, 15, 16];
+  return required.every((index) => (pose[index]?.visibility ?? 0) >= 0.55);
 };
 
 export default function CoachFlow({
@@ -108,12 +132,15 @@ export default function CoachFlow({
   const [counts, setCounts] = useState([0, 0]);
   const [lastScores, setLastScores] = useState<(number | null)[]>([null, null]);
   const [averages, setAverages] = useState<(number | null)[]>([null, null]);
+  const [avatars, setAvatars] = useState<AvatarSnapshot[]>([
+    emptyAvatar(),
+    emptyAvatar(),
+  ]);
   const [cue, setCue] = useState("Quality matters more than speed.");
   const [metrics, setMetrics] = useState<FormMetric[]>([]);
   const [caption, setCaption] = useState("Stop any time, especially if something hurts.");
   const [voiceStatus, setVoiceStatus] = useState("Coach voice starts with the session");
   const [countdown, setCountdown] = useState(3);
-  const [elapsed, setElapsed] = useState(0);
   const [summary, setSummary] = useState<{
     record: SessionRecord;
     badges: ReturnType<typeof achievementsFor>;
@@ -139,7 +166,6 @@ export default function CoachFlow({
   const started = useRef(0);
   const pausedMs = useRef(0);
   const pauseBegan = useRef(0);
-  const ghostRef = useRef<Landmark[] | null>(null);
   const phaseNodes = useRef<(HTMLSpanElement | null)[]>([]);
   const confidenceNode = useRef<HTMLElement | null>(null);
   const lastUi = useRef(0);
@@ -155,15 +181,6 @@ export default function CoachFlow({
     voice.current = new BroadcastVoice(setCaption, setVoiceStatus);
     return () => voice.current?.stop();
   }, []);
-  useEffect(() => {
-    if (arena !== "active") return;
-    const id = setInterval(() => {
-      setElapsed(
-        Math.max(0, Math.round((Date.now() - started.current - pausedMs.current) / 1000)),
-      );
-    }, 250);
-    return () => clearInterval(id);
-  }, [arena]);
   useEffect(() => {
     if (arena !== "countdown") return;
     let count = 3;
@@ -282,6 +299,7 @@ export default function CoachFlow({
     (poses: Landmark[][], timestamp: number) => {
       const phase = arenaRef.current;
       const current = settingsRef.current;
+      const evaluating = phase === "calibrate" || phase === "active";
       let assigned: (Landmark[] | null)[];
       if (!current.demo && registrar.current) {
         const observed = registrar.current.update(poses, timestamp);
@@ -294,20 +312,49 @@ export default function CoachFlow({
           );
           return;
         }
-        if (phase !== "calibrate" && phase !== "active") return;
         if (registrar.current.stage !== "tracking" || observed.ambiguous) {
           if (observed.ambiguous) setCue(observed.message);
           return;
         }
         assigned = observed.assigned;
       } else {
-        if (phase !== "calibrate" && phase !== "active") return;
+        if (phase === "register") return;
         assigned = tracker.current?.update(poses, timestamp) ?? [];
       }
-      assigned.slice(0, current.players).forEach((pose, index) => {
+
+      if (!evaluating) {
+        setAvatars((previous) =>
+          previous.map((avatar, index) => {
+            if (index >= current.players) return avatar;
+            const pose = assigned[index] ?? null;
+            return {
+              ...avatar,
+              pose,
+              tracking: avatarCanTrack(pose, current.exercise),
+            };
+          }),
+        );
+        return;
+      }
+
+      const avatarUpdates: Array<AvatarSnapshot | null> = Array.from(
+        { length: current.players },
+        () => null,
+      );
+      Array.from(
+        { length: current.players },
+        (_, index) => assigned[index] ?? null,
+      ).forEach((pose, index) => {
         const evaluator = evaluators.current[index];
         if (!evaluator) return;
         const result = evaluator.update(pose ?? [], timestamp);
+        avatarUpdates[index] = {
+          pose,
+          tracking: result.live.tracking,
+          progress: result.live.progress,
+          pastTarget: result.live.pastTarget,
+          phase: result.live.phase,
+        };
         if (phase === "calibrate" && result.rep?.valid) {
           calibrators.current[index]?.note(result.rep);
           setPeaks((previous) => {
@@ -397,10 +444,6 @@ export default function CoachFlow({
           sessions.current[index] = context;
         }
         if (index === 0) {
-          ghostRef.current =
-            phase === "active"
-              ? ghostFrame(current.exercise, result.live.progress)
-              : null;
           if (timestamp - lastUi.current > 160) {
             lastUi.current = timestamp;
             phaseNodes.current.forEach((node, place) =>
@@ -411,6 +454,9 @@ export default function CoachFlow({
           }
         }
       });
+      setAvatars((previous) =>
+        previous.map((avatar, index) => avatarUpdates[index] ?? avatar),
+      );
     },
     [finish],
   );
@@ -458,6 +504,7 @@ export default function CoachFlow({
     setCounts([0, 0]);
     setLastScores([null, null]);
     setAverages([null, null]);
+    setAvatars([emptyAvatar(), emptyAvatar()]);
     setMetrics([]);
     setReady(false);
     const skip = next.demo && next.players === 1;
@@ -509,6 +556,14 @@ export default function CoachFlow({
     evaluators.current = chosen.map(
       (target) =>
         new FormEvaluator(settings.exercise, { mode: "score", target }),
+    );
+    setAvatars((previous) =>
+      previous.map((avatar) => ({
+        ...avatar,
+        progress: 0,
+        pastTarget: false,
+        phase: "preparing",
+      })),
     );
     setCountdown(3);
     arenaRef.current = "countdown";
@@ -648,7 +703,7 @@ export default function CoachFlow({
                   );
                 }}
               >
-                Preview this coach
+                Hear {COACHES.find((coach) => coach.id === settings.personality)?.voiceName}&apos;s intro
               </button>
               <label className="field-label">04 / CHALLENGE</label>
               <div className="choice-row">
@@ -776,10 +831,10 @@ export default function CoachFlow({
               <strong>{settings.names[0]}</strong>
               <b data-testid="quality-score">{lastScores[0] ?? "—"}</b>
             </div>
-            <div className="timer">
+            <div className="score-focus">
               <span>{counts[0]}/{settings.goal} SCORED</span>
               <b>{averages[0] ?? "—"}</b>
-              <small>AVERAGE · {elapsed}s</small>
+              <small>AVERAGE QUALITY</small>
             </div>
             {settings.players === 2 ? (
               <div className="player red">
@@ -797,18 +852,40 @@ export default function CoachFlow({
           </div>
           <div className="broadcast-grid coach-broadcast">
             <div className="camera-shell">
-              <VisionStage
-                demo={settings.demo}
-                players={settings.players}
-                mode="arm-raises"
-                exercise={settings.exercise}
-                demoMotion="coach"
-                demoPlaying={arena === "calibrate" || arena === "active"}
-                running={arena === "active"}
-                ghostRef={ghostRef}
-                onPoses={onPoses}
-                onStatus={onVisionStatus}
-              />
+              <div className={`coach-motion-split ${arena === "register" ? "camera-only" : ""}`}>
+                <div className="coach-camera-pane">
+                  <VisionStage
+                    demo={settings.demo}
+                    players={settings.players}
+                    mode="arm-raises"
+                    exercise={settings.exercise}
+                    demoMotion="coach"
+                    demoPlaying={arena === "calibrate" || arena === "active"}
+                    running={arena === "active"}
+                    onPoses={onPoses}
+                    onStatus={onVisionStatus}
+                    showPoseOverlay={settings.demo}
+                  />
+                </div>
+                {arena !== "register" && (
+                  <div className="coach-avatar-pane">
+                    {avatars.slice(0, settings.players).map((avatar, index) => (
+                      <PoseAvatar
+                        key={index}
+                        pose={avatar.pose}
+                        exercise={settings.exercise}
+                        target={arena === "calibrate" ? peaks[index] : targets[index]}
+                        tracking={avatar.tracking}
+                        progress={avatar.progress}
+                        pastTarget={avatar.pastTarget}
+                        phase={avatar.phase}
+                        calibrating={arena === "calibrate"}
+                        name={settings.names[index]}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
               <div className="phase-rail" aria-label="Movement phase">
                 {phaseLabels.map((label, index) => (
                   <span
