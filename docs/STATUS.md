@@ -30,6 +30,28 @@ Optional real voice: copy `.env.example` to `.env.local`, set `ELEVENLABS_API_KE
 
 Optional shared board: set `DATABASE_URL` to a Neon Postgres connection string and restart. Without it, `GET /api/leaderboard` returns `{ enabled: false }` and scores stay in `localStorage`. The route creates `leaderboard` if the database is reachable. Do not put that URL in a `NEXT_PUBLIC_` variable.
 
+## Broadcast scoring — November 14, later session
+
+Arcade matches now score form instead of adding 1 per rep. Guided Coach is unchanged.
+
+- Each completed open-and-close is worth `1 + form/100` (perfect = 2). The higher total wins.
+- Form is 50 open, 35 return, and up to 15 for an upright torso. Jumping jacks split the open and the return evenly between arms and feet. The lower wrist caps the arm score. A barely legal rep is about 40 form (1.4 points). Full range is 100.
+- A brief landmark blink still counts, graded from the smoothed peak. Leaving the frame for about half a second pauses the clock and scoring for both players until both are fully back.
+- The broadcast screen keeps its layout and adds live arm and foot meters, a best-this-attempt mark, a rep flash (`1.4 · feet`), and a scoreboard line with total, reps, and average form. The announcer says the form average only in the final call.
+- Arcade arm raises now need shoulders, hands, and hips before Start match. Coach arm raises still need shoulders and hands.
+- Arm raises lose up to 30 form points when the lift and lower finish in 600 ms or less. The flash can read `pace`. A raise of 1.2 seconds or longer keeps the pace points. Jumping jacks are not paced.
+- Solo practice results say "YOUR SCORE." and the final call says "Your score is …". Head-to-head matches still name a winner. Two-player ties still say "SHARED GLORY."
+- During an arm raise, the live view shows "Too fast", "Too slow", or "Pace good" on one line in its own box beside the points flash. Both slots stay reserved, so one box disappearing does not move the other. The arm meter box does not change height. Holding still does not show a pace warning.
+- After the camera has seen the required body, Start match stays clickable for 8 seconds if the player leans out to reach it. A click while they are out of frame waits, and the countdown starts when they step back in. Confirm keeps the last good registration pose for the same 8 seconds. The in-match pause banner does not capture clicks. Leaving the frame during a match still pauses the clock.
+
+Verification this session:
+
+- `npx vitest run`: 53 tests passed across 7 files. `src/app/api/leaderboard/route.test.ts` did not run because `@neondatabase/serverless` is not installed.
+- `npx eslint` passed on the broadcast scoring files. `npx tsc --noEmit` reports only the missing Neon module in `src/app/api/leaderboard/route.ts`.
+- Browser, Demo Mode, 15-second jumping jacks: both players scored perfect 2-point reps (for example Alex 10.0 from 5 reps, Jordan 6.0 from 3). The results screen showed the point total, rep count, and form 100, labeled synthetic. The final announcer line was “Alex wins, 5 reps, form 100.” Live meters followed the pose and kept a lime mark at the best of the attempt. A 390px-wide viewport had no horizontal overflow on the results screen or during a live match. The shared pause was not triggered in the browser because the synthetic athletes never leave the frame; the pause behavior is covered by the engine unit test. No physical webcam pass was done.
+- Start-button hold: `npx vitest run src/lib/identity.test.ts` passed 5 tests, including a lean-out confirm. Demo Mode still enabled Start match and reached the countdown. The 8-second live-camera hold was not tried on a physical webcam.
+- Demo Mode arm raises: the speed box stays left of the points box and shows "Too fast" on one line. Each box's edge stayed fixed while the other appeared and disappeared. Synthetic poses only.
+
 ## What changed on November 14
 
 The arcade path is still the landing headline, `GameEngine`, `ActivityDetector`, `PlayerTracker`, and the original three Playwright journeys in `tests/broadcast.spec.ts`.

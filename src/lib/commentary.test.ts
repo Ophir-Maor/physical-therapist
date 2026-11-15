@@ -1,12 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { CommentaryQueue, coachCommentary, commentaryFor } from "./commentary";
 import type { GameEvent } from "./engine";
-const event = (type: string, scores = [5, 4]): GameEvent => ({
+const event = (
+  type: string,
+  scores = [5, 4],
+  extra: Partial<GameEvent> = {},
+): GameEvent => ({
   id: "1",
   type: type as GameEvent["type"],
   scores,
+  reps: scores,
+  averages: scores.map(() => 0),
   timestamp: 1000,
   player: 0,
+  ...extra,
 });
 describe("commentary queue", () => {
   it("prioritizes important events and deduplicates event IDs", () => {
@@ -47,8 +54,29 @@ describe("event commentary", () => {
       commentaryFor(event("MATCH_FINISHED", [2, 3]), ["Ada", "Max"], "dry"),
     ).toContain("Max wins");
     expect(
+      commentaryFor(
+        event("MATCH_FINISHED", [4, 8], {
+          reps: [2, 4],
+          averages: [40, 72],
+          player: 1,
+        }),
+        ["Ada", "Max"],
+        "hype",
+      ),
+    ).toContain("Max wins, 4 reps, form 72");
+    expect(
       commentaryFor(event("MATCH_FINISHED", [3, 3]), ["Ada", "Max"], "dry"),
     ).toContain("draw");
+    expect(
+      commentaryFor(
+        event("MATCH_FINISHED", [11.1], { reps: [6], averages: [86] }),
+        ["Alex"],
+        "hype",
+      ),
+    ).toContain("Your score is 11.1, 6 reps, form 86");
+    expect(
+      commentaryFor(event("MATCH_FINISHED", [11.1], { reps: [6] }), ["Alex"], "hype"),
+    ).not.toContain("wins");
   });
 });
 

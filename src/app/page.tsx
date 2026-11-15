@@ -23,8 +23,10 @@ import {
   GameEngine,
   PlayerTracker,
   type Landmark,
+  type LiveMeters,
   type Mode,
 } from "@/lib/engine";
+import { bodyCovered } from "@/lib/broadcast-score";
 import { BroadcastVoice, commentaryFor } from "@/lib/commentary";
 import { IdentityRegistrar } from "@/lib/identity";
 import { saveSession } from "@/lib/progress";
@@ -62,12 +64,24 @@ export default function Home() {
   const [coachStep, setCoachStep] = useState<"setup" | "progress">("setup");
   const [settings, setSettings] = useState<Settings>(defaults);
   const [scores, setScores] = useState([0, 0]);
+  const [reps, setReps] = useState([0, 0]);
+  const [averages, setAverages] = useState([0, 0]);
+  const [meters, setMeters] = useState<LiveMeters[]>([]);
+  const [flash, setFlash] = useState<{
+    id: string;
+    player: number;
+    points: number;
+    weakest: string;
+  } | null>(null);
+  const [pauseText, setPauseText] = useState("");
   const [winner, setWinner] = useState<number | null>(null);
   const [eventLog, setEventLog] = useState("");
   const [remaining, setRemaining] = useState(30);
   const [countdown, setCountdown] = useState(3);
   const [status, setStatus] = useState("Preparing the arena…");
   const [ready, setReady] = useState(false);
+  const [startHeld, setStartHeld] = useState(false);
+  const [awaitingReturn, setAwaitingReturn] = useState(false);
   const [voiceStatus, setVoiceStatus] = useState(
     "Voice initializes when you start",
   );
@@ -79,8 +93,15 @@ export default function Home() {
   const [muted, setMuted] = useState(false);
   const [diagnostics, setDiagnostics] = useState<string[]>([]);
   const [history, setHistory] = useState<
-    { names: string[]; scores: number[]; demo: boolean }[]
+    {
+      names: string[];
+      scores: number[];
+      reps?: number[];
+      averages?: number[];
+      demo: boolean;
+    }[]
   >([]);
+  const gapStarted = useRef(0);
   const engine = useRef<GameEngine | null>(null);
   const detectors = useRef<ActivityDetector[]>([]);
   const tracker = useRef<PlayerTracker | null>(null);
@@ -92,6 +113,7 @@ export default function Home() {
   const settingsRef = useRef(settings);
   const audio = useRef<AudioContext | null>(null);
   const lastDebug = useRef(0);
+  const readySeen = useRef(0);
   const regKey = useRef("");
   const debugRef = useRef(debug);
   useEffect(() => {
@@ -177,6 +199,21 @@ export default function Home() {
         ? previous
         : [...game.scores],
     );
+    setReps((previous) =>
+      previous.length === game.repCounts.length &&
+      previous.every((count, index) => count === game.repCounts[index])
+        ? previous
+        : [...game.repCounts],
+    );
+    const averagesNow = game.averages;
+    setAverages((previous) =>
+      previous.length === averagesNow.length &&
+      previous.every(
+        (value, index) => Math.round(value) === Math.round(averagesNow[index]),
+      )
+        ? previous
+        : averagesNow,
+    );
     setRemaining((previous) =>
       Math.ceil(previous) === Math.ceil(game.remaining)
         ? previous
@@ -189,6 +226,13 @@ export default function Home() {
         s.names.slice(0, s.players),
         s.personality,
       );
+      if (event.type === "REP_COMPLETED")
+        setFlash({
+          id: event.id,
+          player: event.player ?? 0,
+          points: event.points ?? 0,
+          weakest: event.weakest ?? "clean",
+        });
       if (text)
         voice.current?.enqueue(
           text,
@@ -216,6 +260,8 @@ export default function Home() {
       const entry = {
         names: settingsRef.current.names.slice(0, settingsRef.current.players),
         scores: [...game.scores],
+        reps: [...game.repCounts],
+        averages: game.averages,
         demo: settingsRef.current.demo,
       };
       saveSession({
@@ -226,9 +272,9 @@ export default function Home() {
         challenge: "timed",
         personality: settingsRef.current.personality,
         names: entry.names,
-        reps: entry.scores,
-        qualities: [],
-        average: null,
+        reps: entry.reps,
+        qualities: entry.averages.map((value) => Math.round(value)),
+        average: entry.averages[0] == null ? null : Math.round(entry.averages[0]),
         consistency: null,
         target: null,
         durationSec: settingsRef.current.duration,
@@ -271,6 +317,10 @@ export default function Home() {
       if (count === 0) {
         clearInterval(id);
         detectors.current.forEach((d) => d.reset());
+        gapStarted.current = 0;
+        setPauseText("");
+        setFlash(null);
+        setMeters([]);
         engine.current?.start(performance.now());
         phaseRef.current = "active";
         setPhase("active");
@@ -279,6 +329,11 @@ export default function Home() {
     }, 1000);
     return () => clearInterval(id);
   }, [phase, consume, sound]);
+  useEffect(() => {
+    if (!flash) return;
+    const id = window.setTimeout(() => setFlash(null), 1700);
+    return () => window.clearTimeout(id);
+  }, [flash]);
   const overlay = useCallback(() => painted.current, []);
   const onPoses = useCallback(
     (poses: Landmark[][], timestamp: number) => {
@@ -300,6 +355,11 @@ export default function Home() {
           (registrar.current.stage !== "tracking" || observed.ambiguous)
         ) {
           painted.current = assigned;
+          engine.current?.pause(performance.now());
+          setPauseText(
+            observed.message || "Step apart so both players are fully in frame.",
+          );
+          consume();
           return;
         }
       }
@@ -314,15 +374,40 @@ export default function Home() {
         );
       }
       if (phaseRef.current !== "active") return;
-      assigned.forEach((pose, i) => {
-        for (const event of detectors.current[i].update(
-          pose || [],
-          timestamp,
-        )) {
-          if (event.type === "REP_COMPLETED")
-            engine.current?.rep(i, performance.now());
+      const current = settingsRef.current;
+      const missing = assigned
+        .slice(0, current.players)
+        .map((pose, index) =>
+          bodyCovered(pose, current.mode) ? "" : current.names[index],
+        )
+        .filter(Boolean);
+      if (missing.length) {
+        if (!gapStarted.current) gapStarted.current = timestamp;
+        if (timestamp - gapStarted.current >= 500) {
+          engine.current?.pause(performance.now());
+          const text = `${missing.join(" and ")}, step back into the frame.`;
+          setPauseText((previous) => (previous === text ? previous : text));
         }
-      });
+      } else {
+        gapStarted.current = 0;
+        engine.current?.resume(performance.now());
+        setPauseText((previous) => (previous ? "" : previous));
+      }
+      if (!engine.current?.paused) {
+        assigned.forEach((pose, i) => {
+          for (const event of detectors.current[i]?.update(pose || [], timestamp) ??
+            []) {
+            if (event.type === "REP_COMPLETED")
+              engine.current?.rep(i, performance.now(), {
+                form: event.grade.form,
+                weakest: event.grade.weakest,
+              });
+          }
+        });
+      }
+      setMeters(
+        detectors.current.map((detector) => ({ ...detector.meters })),
+      );
       consume();
     },
     [consume],
@@ -330,7 +415,41 @@ export default function Home() {
   const onStatus = useCallback((message: string, isReady: boolean) => {
     setStatus(message);
     setReady(isReady);
+    if (isReady) readySeen.current = performance.now();
   }, []);
+  const beginCountdown = useCallback(() => {
+    const current = settingsRef.current;
+    voice.current?.enqueue(
+      `${current.names.slice(0, current.players).join(" versus ")}. Welcome to the ${activity(current.mode)}!`,
+      5,
+    );
+    setAwaitingReturn(false);
+    setCountdown(3);
+    setPhase("countdown");
+  }, []);
+  useEffect(() => {
+    if (phase !== "calibration") {
+      setStartHeld(false);
+      return;
+    }
+    if (ready) {
+      setStartHeld(true);
+      return;
+    }
+    const remainingHold = 8000 - (performance.now() - readySeen.current);
+    if (remainingHold <= 0) {
+      setStartHeld(false);
+      return;
+    }
+    const id = window.setTimeout(() => setStartHeld(false), remainingHold);
+    return () => window.clearTimeout(id);
+  }, [ready, phase]);
+  useEffect(() => {
+    if (phase !== "calibration") setAwaitingReturn(false);
+  }, [phase]);
+  useEffect(() => {
+    if (awaitingReturn && ready && phase === "calibration") beginCountdown();
+  }, [awaitingReturn, ready, phase, beginCountdown]);
   function prepare() {
     const clean = {
       ...settings,
@@ -374,8 +493,17 @@ export default function Home() {
     );
     processed.current = 0;
     setScores(Array(clean.players).fill(0));
+    setReps(Array(clean.players).fill(0));
+    setAverages(Array(clean.players).fill(0));
+    setMeters([]);
+    setFlash(null);
+    setPauseText("");
+    gapStarted.current = 0;
     setRemaining(clean.duration);
     setReady(false);
+    setStartHeld(false);
+    setAwaitingReturn(false);
+    readySeen.current = 0;
     setTranscript([]);
     setCaption("The smallest stage. The biggest occasion.");
     setPhase("calibration");
@@ -741,7 +869,7 @@ export default function Home() {
               {history.map((h, i) => (
                 <p key={i}>
                   {h.demo ? "DEMO" : "LIVE"} · {h.names.join(" vs ")} ·{" "}
-                  {h.scores.join(" : ")}
+                  {h.scores.map((score) => score.toFixed(1)).join(" : ")}
                 </p>
               ))}
             </div>
@@ -769,10 +897,19 @@ export default function Home() {
                 PLAYER 01 / {settings.players === 1 ? "PRACTICE" : "HOME"}
               </span>
               <strong>{settings.names[0]}</strong>
-              <b>{scores[0]}</b>
+              <small className="player-meta">
+                {reps[0] ?? 0} reps · form {Math.round(averages[0] ?? 0)}
+              </small>
+              <b>{(scores[0] ?? 0).toFixed(1)}</b>
             </div>
             <div className="timer">
-              <span>{phase === "active" ? "ON THE CLOCK" : "PRE-GAME"}</span>
+              <span>
+                {pauseText
+                  ? "CLOCK PAUSED"
+                  : phase === "active"
+                    ? "ON THE CLOCK"
+                    : "PRE-GAME"}
+              </span>
               <b className={remaining <= 10 ? "urgent" : ""}>
                 {Math.floor(Math.ceil(remaining) / 60)
                   .toString()
@@ -785,7 +922,10 @@ export default function Home() {
               <div className="player red">
                 <span>PLAYER 02 / AWAY</span>
                 <strong>{settings.names[1]}</strong>
-                <b>{scores[1]}</b>
+                <small className="player-meta">
+                  {reps[1] ?? 0} reps · form {Math.round(averages[1] ?? 0)}
+                </small>
+                <b>{(scores[1] ?? 0).toFixed(1)}</b>
               </div>
             ) : (
               <div className="solo-card">
@@ -794,6 +934,33 @@ export default function Home() {
               </div>
             )}
           </div>
+          {phase === "active" && (
+            <div className="form-meters">
+              {Array.from({ length: settings.players }, (_, index) => {
+                const meter = meters[index];
+                return (
+                  <div
+                    key={index}
+                    className={index === 0 ? "meter-player blue" : "meter-player red"}
+                  >
+                    <span>{settings.names[index]}</span>
+                    <Meter
+                      label="Arms"
+                      value={meter?.arms ?? null}
+                      best={meter?.bestArms ?? 0}
+                    />
+                    {settings.mode === "jumping-jacks" && (
+                      <Meter
+                        label="Feet"
+                        value={meter?.feet ?? null}
+                        best={meter?.bestFeet ?? 0}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
           <div className="broadcast-grid">
             <div className="camera-shell">
               <VisionStage
@@ -861,18 +1028,24 @@ export default function Home() {
                     )}
                     <button
                       className="primary"
-                      disabled={!ready || !enrolled}
+                      disabled={
+                        awaitingReturn || !enrolled || (!ready && !startHeld)
+                      }
                       onClick={() => {
-                        voice.current?.enqueue(
-                          `${settings.names.slice(0, settings.players).join(" versus ")}. Welcome to the ${activity(settings.mode)}!`,
-                          5,
-                        );
-                        setCountdown(3);
-                        setPhase("countdown");
+                        if (ready) beginCountdown();
+                        else setAwaitingReturn(true);
                       }}
                     >
-                      Start match <ArrowRight size={18} />
+                      {awaitingReturn ? "Step back in to start" : "Start match"}{" "}
+                      {!awaitingReturn && <ArrowRight size={18} />}
                     </button>
+                    {!settings.demo && (
+                      <small>
+                        {awaitingReturn
+                          ? "Click saved. The countdown starts when your full starting position is back in frame."
+                          : "Leaning out to reach this button keeps it clickable for a few seconds."}
+                      </small>
+                    )}
                     {!settings.demo && settings.players === 2 && (
                       <button
                         className="text-button"
@@ -884,6 +1057,52 @@ export default function Home() {
                         Switch to one-player setup
                       </button>
                     )}
+                  </div>
+                </div>
+              )}
+              {pauseText && phase === "active" && (
+                <div className="pause-overlay" role="status">
+                  <span>CLOCK PAUSED</span>
+                  <b>{pauseText}</b>
+                </div>
+              )}
+              {phase === "active" && (
+                <div
+                  className={
+                    settings.mode === "arm-raises" ? "live-cues live-cues-pair" : "live-cues"
+                  }
+                >
+                  {settings.mode === "arm-raises" && (
+                    <div className="pace-overlay">
+                      {Array.from({ length: settings.players }, (_, index) => {
+                        const pace = meters[index]?.pace;
+                        const showing =
+                          pace === "fast" || pace === "slow" || pace === "good";
+                        const label = showing
+                          ? settings.players === 1
+                            ? paceCopy(pace)
+                            : `${settings.names[index]} · ${paceCopy(pace)}`
+                          : "Pace good";
+                        return (
+                          <span
+                            key={index}
+                            className={showing ? `pace-live pace-${pace}` : "pace-live cue-held"}
+                            aria-hidden={!showing}
+                          >
+                            {label}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div
+                    className={flash ? "rep-flash" : "rep-flash cue-held"}
+                    role={flash ? "status" : undefined}
+                    aria-hidden={!flash}
+                  >
+                    {flash
+                      ? `${(flash.points ?? 0).toFixed(1)} · ${flash.weakest}`
+                      : "0.0 · pace"}
                   </div>
                 </div>
               )}
@@ -933,7 +1152,7 @@ export default function Home() {
                   {status}
                 </span>
                 <small>
-                  Counted reps require a full closed → open → closed cycle.
+                  A full open-and-close scores 1 plus form. Leaving the frame pauses the clock for both players.
                   {regAmbiguous
                     ? " Scoring is paused while the players are ambiguous."
                     : ""}
@@ -976,9 +1195,11 @@ export default function Home() {
           </div>
           <Trophy className="result-trophy" size={62} />
           <h2>
-            {winner === null
-              ? "SHARED GLORY."
-              : `${settings.names[winner ?? 0].toUpperCase()} WINS.`}
+            {settings.players === 1
+              ? "YOUR SCORE."
+              : winner === null
+                ? "SHARED GLORY."
+                : `${settings.names[winner ?? 0].toUpperCase()} WINS.`}
           </h2>
           <p className="result-subtitle">
             A monumental day in exceptionally minor sports.
@@ -987,9 +1208,10 @@ export default function Home() {
             {scores.map((score, i) => (
               <div key={i} className={i === 0 ? "blue" : "red"}>
                 <span>{settings.names[i]}</span>
-                <b>{score}</b>
+                <b>{score.toFixed(1)}</b>
                 <small>
-                  VERIFIED CYCLES{settings.demo ? " · SYNTHETIC" : ""}
+                  {reps[i] ?? 0} REPS · FORM {Math.round(averages[i] ?? 0)}
+                  {settings.demo ? " · SYNTHETIC" : ""}
                 </small>
               </div>
             ))}
@@ -997,11 +1219,14 @@ export default function Home() {
           <div className="recap panel">
             <span className="eyebrow">THE POST-GAME REPORT</span>
             <p>
-              {scores.reduce((a, b) => a + b, 0)} complete reps.{" "}
+              {reps.reduce((a, b) => a + b, 0)} complete reps, scored{" "}
+              {scores.reduce((a, b) => a + b, 0).toFixed(1)}.{" "}
               {settings.duration} seconds of commitment.{" "}
-              {winner === null
-                ? "The judges have declared a tie. The furniture remains neutral."
-                : `${settings.names[winner ?? 0]} takes the crown. The trophy is imaginary. The bragging rights are very real.`}
+              {settings.players === 1
+                ? "That's your score for this session."
+                : winner === null
+                  ? "The judges have declared a tie. The furniture remains neutral."
+                  : `${settings.names[winner ?? 0]} takes the crown. The trophy is imaginary. The bragging rights are very real.`}
             </p>
           </div>
           <div className="result-actions">
@@ -1038,5 +1263,36 @@ export default function Home() {
         <span>BUILT FOR THE UNREMARKABLE.</span>
       </footer>
     </main>
+  );
+}
+
+function paceCopy(pace: "fast" | "slow" | "good" | "idle") {
+  if (pace === "fast") return "Too fast";
+  if (pace === "slow") return "Too slow";
+  if (pace === "good") return "Pace good";
+  return "";
+}
+
+function Meter({
+  label,
+  value,
+  best,
+}: {
+  label: string;
+  value: number | null;
+  best: number;
+}) {
+  const width = value == null ? 0 : Math.max(0, Math.min(100, value));
+  return (
+    <div className="meter">
+      <span>{value == null ? `${label} not visible` : label}</span>
+      <div className="meter-track">
+        <div className="meter-fill" style={{ width: `${width}%` }} />
+        <i
+          className="meter-best"
+          style={{ left: `${Math.max(0, Math.min(100, best))}%` }}
+        />
+      </div>
+    </div>
   );
 }
