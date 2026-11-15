@@ -8,9 +8,13 @@ test("championship board filters and empty or loaded state", async ({ page }) =>
   await expect(page.getByLabel("Repetition goal")).toHaveCount(0);
   await expect(page.getByLabel("Range target")).toHaveCount(0);
   await expect(page.getByLabel("Duration")).toHaveCount(0);
-  await page.getByLabel("Exercise").selectOption({ label: "Jumping jacks" });
+  await expect(page.getByLabel("Exercise").locator("option")).toHaveText([
+    "Controlled arm raises",
+    "Controlled squats",
+  ]);
+  await page.getByLabel("Exercise").selectOption({ label: "Controlled squats" });
   await expect(page.getByLabel("Duration")).toHaveCount(0);
-  await expect(page.getByLabel("Challenge")).toHaveValue("reps");
+  await expect(page.getByLabel("Challenge")).toHaveValue("form");
   await page.getByRole("button", { name: "Refresh" }).click();
   await expect(
     page.getByText(/no scores in this category yet|average quality|could not be loaded|unavailable/i).first(),

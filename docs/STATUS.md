@@ -22,8 +22,8 @@ npm run dev
 Open http://localhost:3000. `http://127.0.0.1:3000` is also allowed in dev (`allowedDevOrigins`). Using the other host used to load the page with no JavaScript, so buttons did nothing. Hard-refresh after a dev-server restart.
 
 - **Start Training** opens Guided Coach: demonstration, calibration, form scoring, and one of four coaches.
-- **Arcade Championship** is a first-to-5, 10, or 15 rep-count broadcast as a secondary mode.
-- **Quality board** opens `/leaderboard`, ranked by average form quality.
+- Playable exercises are controlled arm raises and controlled squats. Jumping jacks and the arcade arm-raise race are no longer offered, and those boards are not selectable.
+- **Quality board** opens `/leaderboard`, ranked by average form quality for the two controlled exercises.
 - Demo Mode needs neither a camera nor API keys. Live webcam is requested only after the user chooses it and continues.
 - The landing page’s right-hand “GO BIG” illustration is replaced by the live championship board for the selected exercise and challenge. It uses the same `/api/leaderboard` top 10, and **Open full board** keeps that category.
 - Guided Coach setup uses dropdowns for coach and challenge. Exercise and player count stay as buttons. Scored reps are a 1–99 number box with up and down controls and the words “quality reps” beside it. The default is 4. The selected coach and challenge each keep one line of detail. The Hear intro button sits 28px above the challenge title. Dropdowns do not keep the lime focus outline after a choice is clicked.
@@ -35,7 +35,7 @@ Shared board: quality rankings are the primary board. A coach row ranks by the a
 
 ## What changed on November 14
 
-The arcade path is still the landing headline, `GameEngine`, `ActivityDetector`, `PlayerTracker`, and the original three Playwright journeys in `tests/broadcast.spec.ts`.
+Jumping jacks and arcade arm raises are removed from the landing page, coach setup, and championship filters. The public boards are controlled arm raises and controlled squats, each with Form and Consistency. Older arcade rows can remain in the database, but the app no longer lists or accepts them. On November 14, 20 sample rows were added to each of those four boards, with mixed high, middle, and low quality scores and separate nicknames. The existing controlled-arm-raise consistency row remains, so that board has 21 rows. The page still shows only the top 10.
 
 ### Optional coach introductions
 
@@ -94,8 +94,6 @@ The page at `/leaderboard` is linked from the home-page board, arcade setup, arc
 
 | Exercise | Challenge | Grouping | Rank |
 | --- | --- | --- | --- |
-| Jumping jacks | Arcade Championship | All submitted live rep-goal sets | Reps |
-| Arm raises | Arcade Championship | All submitted live rep-goal sets | Reps |
 | Controlled arm raises | Form | All submitted live sets | Average quality |
 | Controlled arm raises | Consistency | All submitted live sets | Average quality |
 | Controlled squats | Form | All submitted live sets | Average quality |
@@ -110,7 +108,7 @@ cd '/Users/alinamaor/Documents/SanD Hacks/everyday-league'
 npm run dev
 ```
 
-Open http://127.0.0.1:3000/leaderboard. The page opens on controlled arm raises and Form. Switch the exercise to arcade **Arm raises** to view its rep-count board. Legacy duration-based rows are intentionally not mixed into the new board. Other categories stay empty until a live, non-demo session is submitted.
+Open http://127.0.0.1:3000/leaderboard. The page opens on controlled arm raises and Form. The exercise list is controlled arm raises and controlled squats. Other categories stay empty until a live, non-demo session is submitted.
 
 ## Coaching session context
 
