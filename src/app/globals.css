@@ -308,11 +308,11 @@ h2 {
   margin-bottom: 16px;
   font-size: 10px;
 }
-.dropdown-detail {
-  margin: -6px 0 18px;
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.45;
+.age-field {
+  max-width: 140px;
+}
+.age-field input::placeholder {
+  color: #6d7474;
 }
 .coach-preview {
   margin-bottom: 28px;

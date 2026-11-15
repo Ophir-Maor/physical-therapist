@@ -17,6 +17,12 @@ import {
   type CoachId,
 } from "@/lib/exercises";
 import {
+  FALLBACK_EXERCISES,
+  exercisesForAge,
+  parseAge,
+  type CatalogItem,
+} from "@/lib/exercise-catalog";
+import {
   FALLBACK_TARGET,
   FormEvaluator,
   RangeCalibrator,
@@ -58,6 +64,7 @@ type AvatarSnapshot = {
 };
 type Settings = {
   exercise: ExerciseId;
+  catalogId: string;
   players: 1 | 2;
   names: [string, string];
   personality: CoachId;
@@ -77,6 +84,7 @@ const PHASES: PhaseName[] = [
 
 const initial: Settings = {
   exercise: "arm-raises",
+  catalogId: "arm-raises",
   players: 1,
   names: ["Alex", "Jordan"],
   personality: "supportive",
@@ -120,6 +128,44 @@ export default function CoachFlow({
     ...initial,
     personality: initialPersonality,
   });
+  const [catalog, setCatalog] = useState<CatalogItem[]>(FALLBACK_EXERCISES);
+  const [catalogNote, setCatalogNote] = useState(
+    "Built-in exercises until a list is ready.",
+  );
+  const [ageText, setAgeText] = useState("");
+  const age = parseAge(ageText);
+  const visibleExercises = exercisesForAge(catalog, age);
+  useEffect(() => {
+    let cancel = false;
+    void (async () => {
+      try {
+        const response = await fetch("/api/exercises");
+        const body = (await response.json()) as {
+          exercises?: CatalogItem[];
+          message?: string;
+        };
+        if (cancel || !Array.isArray(body.exercises) || body.exercises.length === 0) return;
+        setCatalog(body.exercises);
+        if (body.message) setCatalogNote(body.message);
+      } catch {
+        if (!cancel) setCatalogNote("Showing the built-in exercises.");
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, []);
+  useEffect(() => {
+    const visible = exercisesForAge(catalog, parseAge(ageText));
+    if (visible.some((item) => item.id === settings.catalogId)) return;
+    const next = visible[0];
+    if (!next) return;
+    setSettings((current) => ({
+      ...current,
+      exercise: next.movement,
+      catalogId: next.id,
+    }));
+  }, [ageText, catalog, settings.catalogId]);
   const [ready, setReady] = useState(false);
   const [status, setStatus] = useState("Step into the frame.");
   const [reg, setReg] = useState({
@@ -647,7 +693,12 @@ export default function CoachFlow({
     arenaRef.current = "active";
     setArena("active");
   }
-  const guide = EXERCISES[settings.exercise];
+  const chosen = catalog.find((item) => item.id === settings.catalogId);
+  const baseGuide = EXERCISES[settings.exercise];
+  const guide =
+    chosen && chosen.movement === settings.exercise
+      ? { ...baseGuide, name: chosen.title, summary: chosen.summary }
+      : baseGuide;
   const phaseLabels =
     settings.exercise === "squats"
       ? ["Preparing", "Lowering", "Target", "Rising", "Rep done"]
@@ -677,18 +728,45 @@ export default function CoachFlow({
           <div className="setup-grid">
             <div className="panel settings">
               <label className="field-label">01 / EXERCISE</label>
+              <label className="field-label age-field">
+                Age, optional
+                <input
+                  aria-label="Age"
+                  inputMode="numeric"
+                  maxLength={2}
+                  placeholder="Any"
+                  value={ageText}
+                  onChange={(event) => setAgeText(event.target.value.replace(/\D/g, "").slice(0, 2))}
+                />
+              </label>
+              <p className="dropdown-detail">{catalogNote}</p>
               <div className="choice-row">
-                {(Object.keys(EXERCISES) as ExerciseId[]).map((exercise) => (
+                {visibleExercises.map((item) => (
                   <button
-                    key={exercise}
-                    className={`choice ${settings.exercise === exercise ? "selected" : ""}`}
-                    onClick={() => setSettings({ ...settings, exercise })}
+                    key={item.id}
+                    className={`choice ${settings.catalogId === item.id ? "selected" : ""}`}
+                    onClick={() =>
+                      setSettings({
+                        ...settings,
+                        exercise: item.movement,
+                        catalogId: item.id,
+                      })
+                    }
                   >
-                    <strong>{EXERCISES[exercise].name}</strong>
-                    <small>{EXERCISES[exercise].areas}</small>
+                    <strong>{item.title}</strong>
+                    <small>
+                      Ages {item.ageMin}–{item.ageMax}
+                      {item.movement === "squats" ? " · squat score" : " · arm-raise score"}
+                    </small>
                   </button>
                 ))}
               </div>
+              {ageText.trim() !== "" && age == null && (
+                <p className="dropdown-detail">Enter an age from 8 to 99, or leave it blank.</p>
+              )}
+              {age != null && visibleExercises.length === 0 && (
+                <p className="dropdown-detail">No exercises in that age range.</p>
+              )}
               <label className="field-label">02 / WHO IS PRACTICING</label>
               <div className="choice-row">
                 {[1, 2].map((count) => (
