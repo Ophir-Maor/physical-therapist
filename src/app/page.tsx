@@ -26,7 +26,7 @@ import {
   type Landmark,
   type Mode,
 } from "@/lib/engine";
-import { BroadcastVoice, commentaryFor } from "@/lib/commentary";
+import { BroadcastVoice, coachCommentary, commentaryFor } from "@/lib/commentary";
 import { COACHES, type CoachId } from "@/lib/exercises";
 import { IdentityRegistrar } from "@/lib/identity";
 import { saveSession } from "@/lib/progress";
@@ -42,7 +42,7 @@ type Phase =
 type Settings = {
   names: string[];
   players: number;
-  duration: number;
+  goal: number;
   mode: Mode;
   personality: "hype" | "dry" | "documentary";
   demo: boolean;
@@ -50,7 +50,7 @@ type Settings = {
 const defaults: Settings = {
   names: ["Alex", "Jordan"],
   players: 2,
-  duration: 30,
+  goal: 5,
   mode: "jumping-jacks",
   personality: "hype",
   demo: true,
@@ -67,7 +67,6 @@ export default function Home() {
   const [scores, setScores] = useState([0, 0]);
   const [winner, setWinner] = useState<number | null>(null);
   const [eventLog, setEventLog] = useState("");
-  const [remaining, setRemaining] = useState(30);
   const [countdown, setCountdown] = useState(3);
   const [status, setStatus] = useState("Preparing the arena…");
   const [ready, setReady] = useState(false);
@@ -77,6 +76,7 @@ export default function Home() {
   const [caption, setCaption] = useState(
     "Small movements. Unreasonable stakes.",
   );
+  const [landingPreviewed, setLandingPreviewed] = useState(false);
   const [transcript, setTranscript] = useState<string[]>([]);
   const [debug, setDebug] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -122,7 +122,7 @@ export default function Home() {
         saved &&
         ["jumping-jacks", "arm-raises"].includes(saved.mode) &&
         [1, 2].includes(saved.players) &&
-        [15, 30, 60].includes(saved.duration) &&
+        [5, 10, 15].includes(saved.goal) &&
         ["hype", "dry", "documentary"].includes(saved.personality) &&
         Array.isArray(saved.names) &&
         saved.names.length === 2 &&
@@ -180,11 +180,6 @@ export default function Home() {
         ? previous
         : [...game.scores],
     );
-    setRemaining((previous) =>
-      Math.ceil(previous) === Math.ceil(game.remaining)
-        ? previous
-        : game.remaining,
-    );
     for (const event of game.events.slice(processed.current)) {
       const s = settingsRef.current;
       const text = commentaryFor(
@@ -197,9 +192,7 @@ export default function Home() {
           text,
           event.type === "MATCH_FINISHED"
             ? 10
-            : event.type === "FINAL_TEN_SECONDS"
-              ? 8
-              : 2,
+            : 2,
           event.id,
         );
     }
@@ -226,7 +219,7 @@ export default function Home() {
         at: new Date().toISOString(),
         experience: "arcade",
         exercise: settingsRef.current.mode,
-        challenge: "timed",
+        challenge: "reps",
         personality: settingsRef.current.personality,
         names: entry.names,
         reps: entry.scores,
@@ -234,7 +227,7 @@ export default function Home() {
         average: null,
         consistency: null,
         target: null,
-        durationSec: settingsRef.current.duration,
+        durationSec: 0,
         demo: entry.demo,
       });
       setHistory((old) => {
@@ -246,23 +239,6 @@ export default function Home() {
       });
     }
   }, [sound]);
-  useEffect(() => {
-    if (phase !== "active") return;
-    const id = setInterval(() => {
-      engine.current?.tick(performance.now());
-      consume();
-    }, 80);
-    const visibility = () => {
-      if (document.hidden) {
-        voice.current?.stop();
-      }
-    };
-    document.addEventListener("visibilitychange", visibility);
-    return () => {
-      clearInterval(id);
-      document.removeEventListener("visibilitychange", visibility);
-    };
-  }, [phase, consume]);
   useEffect(() => {
     if (phase !== "countdown") return;
     let count = 3;
@@ -354,7 +330,7 @@ export default function Home() {
     if (!audio.current) audio.current = new AudioContext();
     void audio.current.resume();
     engine.current = new GameEngine({
-      duration: clean.duration,
+      goal: clean.goal,
       players: clean.names.slice(0, clean.players),
     });
     tracker.current = new PlayerTracker(clean.players);
@@ -377,7 +353,6 @@ export default function Home() {
     );
     processed.current = 0;
     setScores(Array(clean.players).fill(0));
-    setRemaining(clean.duration);
     setReady(false);
     setTranscript([]);
     setCaption("The smallest stage. The biggest occasion.");
@@ -431,7 +406,7 @@ export default function Home() {
               <p>
                 Calibrate a comfortable target, score the quality of the
                 movement, and hear a coach respond to what actually changed.
-                Arcade timing is still here when you want it.
+                Rep-count arcade competition is still here when you want it.
               </p>
               <div className="hero-actions">
                 <button
@@ -461,20 +436,51 @@ export default function Home() {
               </div>
               <div className="choice-row hero-coaches">
                 {COACHES.map((coach) => (
-                  <button
-                    key={coach.id}
-                    className="choice"
-                    onClick={() => {
-                      setCoachPersonality(coach.id);
-                      setCoachStep("setup");
-                      setPhase("coach");
-                    }}
-                  >
-                    <strong>{coach.name}</strong>
-                    <small>{coach.detail}</small>
-                  </button>
+                  <div key={coach.id} className="choice coach-choice-card">
+                    <button
+                      type="button"
+                      className="coach-choice-main"
+                      onClick={() => {
+                        voice.current?.stop();
+                        setCoachPersonality(coach.id);
+                        setCoachStep("setup");
+                        setPhase("coach");
+                      }}
+                    >
+                      <strong>{coach.name}</strong>
+                      <small>{coach.detail}</small>
+                    </button>
+                    <button
+                      type="button"
+                      className="coach-intro-button"
+                      aria-label={`Hear ${coach.voiceName}, the ${coach.name}, introduce themselves`}
+                      onClick={() => {
+                        setLandingPreviewed(true);
+                        voice.current?.unlock();
+                        voice.current!.personality = coach.id;
+                        voice.current?.preview(
+                          coachCommentary({
+                            type: "preview",
+                            personality: coach.id,
+                            name: "Player",
+                          }),
+                        );
+                      }}
+                    >
+                      <Volume2 size={14} /> Hear {coach.voiceName}
+                    </button>
+                  </div>
                 ))}
               </div>
+              {landingPreviewed && (
+                <div className="hero-voice-preview" aria-live="polite">
+                  <AudioLines size={15} />
+                  <div>
+                    <p>{caption}</p>
+                    <span>{voiceStatus}</span>
+                  </div>
+                </div>
+              )}
               <div className="hero-meta">
                 <span>
                   <Camera size={15} /> Just bring a webcam
@@ -673,19 +679,19 @@ export default function Home() {
               </div>
               <div className="option-row">
                 <label>
-                  03 / MATCH LENGTH
+                  03 / REP GOAL
                   <select
-                    value={settings.duration}
+                    value={settings.goal}
                     onChange={(e) =>
                       setSettings({
                         ...settings,
-                        duration: Number(e.target.value),
+                        goal: Number(e.target.value),
                       })
                     }
                   >
-                    {[15, 30, 60].map((n) => (
+                    {[5, 10, 15].map((n) => (
                       <option key={n} value={n}>
-                        {n} seconds
+                        First to {n} reps
                       </option>
                     ))}
                   </select>
@@ -793,15 +799,10 @@ export default function Home() {
               <strong>{settings.names[0]}</strong>
               <b>{scores[0]}</b>
             </div>
-            <div className="timer">
-              <span>{phase === "active" ? "ON THE CLOCK" : "PRE-GAME"}</span>
-              <b className={remaining <= 10 ? "urgent" : ""}>
-                {Math.floor(Math.ceil(remaining) / 60)
-                  .toString()
-                  .padStart(2, "0")}
-                :{(Math.ceil(remaining) % 60).toString().padStart(2, "0")}
-              </b>
-              <small>{settings.duration} SECOND CHAMPIONSHIP</small>
+            <div className="score-focus">
+              <span>{phase === "active" ? "RACE TO THE TARGET" : "PRE-GAME"}</span>
+              <b>{settings.goal}</b>
+              <small>COMPLETE REPS TO WIN</small>
             </div>
             {settings.players === 2 ? (
               <div className="player red">
@@ -1020,7 +1021,6 @@ export default function Home() {
             <span className="eyebrow">THE POST-GAME REPORT</span>
             <p>
               {scores.reduce((a, b) => a + b, 0)} complete reps.{" "}
-              {settings.duration} seconds of commitment.{" "}
               {winner === null
                 ? "The judges have declared a tie. The furniture remains neutral."
                 : `${settings.names[winner ?? 0]} takes the crown. The trophy is imaginary. The bragging rights are very real.`}
@@ -1031,12 +1031,13 @@ export default function Home() {
             experience="arcade"
             exercise={settings.mode}
             exerciseLabel={activity(settings.mode)}
-            challenge="timed"
-            challengeLabel="Timed championship"
+            challenge="reps"
+            challengeLabel="Rep championship"
             average={null}
             reps={scores[winner ?? 0] ?? 0}
             target={null}
-            durationSec={settings.duration}
+            durationSec={0}
+            goalReps={settings.goal}
             suggestedName={settings.names[winner ?? 0] || settings.names[0]}
           />
           <div className="result-actions">

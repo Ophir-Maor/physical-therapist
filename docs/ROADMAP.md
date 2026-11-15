@@ -2,7 +2,7 @@
 
 ## Done on `feature/gamified-coaching`
 
-Guided coach, arm-raise and conservative squat scoring, calibration against a demonstrated range, four coach personalities, sequential live registration, form and consistency challenges, device history, achievements, a controlled-versus-rushed demo, and an optional Neon leaderboard that stays off without `DATABASE_URL`. The timed arcade broadcast is still in the app. The work is not committed.
+Guided coach, arm-raise and conservative squat scoring, calibration against a demonstrated range, four coach personalities, sequential live registration, form and consistency challenges, device history, achievements, a controlled-versus-rushed demo, and an optional Neon leaderboard that stays off without `DATABASE_URL`. The arcade broadcast is a first-to-repetition-goal race. The work is not committed.
 
 ## 1. Prove it on the demo laptop
 

@@ -21,9 +21,8 @@ type Props = {
   exercise?: ExerciseId | "jumping-jacks";
   demoMotion?: "arcade" | "coach";
   demoPlaying?: boolean;
-  ghost?: Landmark[] | null;
-  ghostRef?: { current: Landmark[] | null };
   overlay?: () => (Landmark[] | null)[] | null;
+  showPoseOverlay?: boolean;
 };
 
 const CONNECTIONS = [
@@ -131,9 +130,8 @@ function VisionStage({
   exercise,
   demoMotion = "arcade",
   demoPlaying = false,
-  ghost = null,
-  ghostRef,
   overlay,
+  showPoseOverlay = true,
 }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -145,9 +143,8 @@ function VisionStage({
     exercise,
     demoMotion,
     demoPlaying,
-    ghost,
-    ghostRef,
     overlay,
+    showPoseOverlay,
   });
   useEffect(() => {
     live.current = {
@@ -158,9 +155,8 @@ function VisionStage({
       exercise,
       demoMotion,
       demoPlaying,
-      ghost,
-      ghostRef,
       overlay,
+      showPoseOverlay,
     };
   }, [
     onPoses,
@@ -170,9 +166,8 @@ function VisionStage({
     exercise,
     demoMotion,
     demoPlaying,
-    ghost,
-    ghostRef,
     overlay,
+    showPoseOverlay,
   ]);
 
   useEffect(() => {
@@ -250,16 +245,10 @@ function VisionStage({
         ctx.drawImage(court, 0, 0);
         live.current.onPoses(poses, time);
         const painted = live.current.overlay?.() ?? poses;
-        painted.forEach((pose, i) => {
-          if (pose) drawPose(ctx, pose, COLORS[i] || COLORS[0], true);
-        });
-        const ghostPose = live.current.ghostRef?.current ?? live.current.ghost;
-        if (ghostPose) {
-          ctx.save();
-          ctx.globalAlpha = 0.4;
-          drawPose(ctx, ghostPose, "#ddfa51", false);
-          ctx.restore();
-        }
+        if (live.current.showPoseOverlay)
+          painted.forEach((pose, i) => {
+            if (pose) drawPose(ctx, pose, COLORS[i] || COLORS[0], true);
+          });
         report(
           coach
             ? "Synthetic coaching athletes · controlled and rushed examples"
@@ -289,16 +278,10 @@ function VisionStage({
         live.current.onPoses(poses, time);
         const painted =
           live.current.overlay?.() ?? overlayTracker.update(poses, time);
-        painted.forEach((pose, i) => {
-          if (pose) drawPose(ctx, pose, COLORS[i] || COLORS[0], false, true);
-        });
-        const ghostPose = live.current.ghostRef?.current ?? live.current.ghost;
-        if (ghostPose) {
-          ctx.save();
-          ctx.globalAlpha = 0.4;
-          drawPose(ctx, ghostPose, "#ddfa51", false, true);
-          ctx.restore();
-        }
+        if (live.current.showPoseOverlay)
+          painted.forEach((pose, i) => {
+            if (pose) drawPose(ctx, pose, COLORS[i] || COLORS[0], false, true);
+          });
         const required =
           live.current.exercise === "squats"
             ? [23, 24, 25, 26, 27, 28]

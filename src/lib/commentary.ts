@@ -42,15 +42,10 @@ export function commentaryFor(
       "A tie. Our nonexistent bookmakers are deeply concerned.",
       "Balance returns to the competitive ecosystem.",
     ],
-    HALF_TIME: [
-      "Halfway there! Leave absolutely nothing in the living room!",
-      "Halfway. Time continues to perform as expected.",
-      "At the midpoint, endurance becomes the decisive adaptation.",
-    ],
-    FINAL_TEN_SECONDS: [
-      "Ten seconds remain! This is your moment!",
-      "Ten seconds. A manageable length of sporting immortality.",
-      "The final ten seconds will reveal the strongest finish.",
+    HALFWAY_TO_GOAL: [
+      `${player} is halfway to the target! The living room can feel the momentum!`,
+      `${player} has completed half the required repetitions. Efficiently dramatic.`,
+      `${player} reaches the midpoint of the repetition target.`,
     ],
     MATCH_FINISHED: tied
       ? [

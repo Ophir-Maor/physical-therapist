@@ -6,7 +6,7 @@ export type SessionRecord = {
   at: string;
   experience: "coach" | "arcade";
   exercise: ExerciseId | "jumping-jacks";
-  challenge: ChallengeId | "timed";
+  challenge: ChallengeId | "reps";
   personality: CoachId | "hype" | "dry" | "documentary";
   names: string[];
   reps: number[];

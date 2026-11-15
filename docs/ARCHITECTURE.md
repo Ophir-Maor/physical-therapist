@@ -58,11 +58,15 @@ CREATE TABLE IF NOT EXISTS leaderboard (
 
 The handler validates a strict object, refuses `demo: true`, and allows 8 posts per minute per process. That is a local demo guard, not authentication or cheat prevention.
 
+Leaderboard categories are keyed by exercise and challenge; coached rows also require the current scoring version. Arcade duration is not collected or filtered. Calibrated target, selected repetition goal, and completed repetition count are stored and may be shown as coached-result context, but they do not select a quality board or affect rank. Both Form and Consistency boards display and rank the average quality across every scored repetition in the submitted set; consistency breaks an equal average, followed by earlier submission. On-device personal-best comparisons still use similar targets because they compare one athlete's sessions rather than public board placement.
+
 ## Vision
 
 `VisionStage` requests webcam access only after the user enters the webcam arena. It imports MediaPipe client-side, loads `/mediapipe/wasm` and `/mediapipe/pose_landmarker_lite.task`, selects VIDEO mode with one or two poses, attempts GPU, and falls back to CPU if creation fails. A requestAnimationFrame loop limits inference to approximately 20 Hz and skips unchanged video frames. Inference is synchronous on the main thread; there is no Web Worker pipeline.
 
 Video and canvas both use `object-fit: contain` and mirror horizontally. Canvas dimensions follow the actual video dimensions. Returned landmarks are converted into mirrored screen coordinates for identity assignment; overlay drawing accounts for that coordinate conversion. Separate spatial trackers provide score assignment and persistent overlay colors. Camera tracks, animation frames, and model resources are disposed when the arena unmounts. Device, permission, loading, and inference failures expose status messages.
+
+Guided Coach uses those same screen-space landmarks for a split-screen movement avatar. The webcam side stays visually clean; `PoseAvatar` draws the detected head, torso, joints, and limbs in the same normalized positions on the adjacent side. Mirroring continues during calibration, countdown, active coaching, and pause, while `FormEvaluator` only accepts movement during calibration or an active set. Arm targets appear as hand markers, the avatar turns lime on target, and going more than 10% beyond the selected target turns the complete avatar red with a correction alert. Squats use the same target/reached/past-target states without pretending that a single camera can measure clinical depth. The old coached ghost guide is no longer drawn. Arcade keeps its existing pose overlay.
 
 Synthetic mode never opens a camera or initializes MediaPipe. Its fixture athletes cycle at different fixed periods and pass through the same detectors. Demo results are labeled synthetic. This tests the pipeline, not pose-estimation quality.
 
@@ -76,9 +80,9 @@ Jumping jacks require wrists above shoulders and feet spread for the open positi
 
 ## Match rules
 
-`GameEngine` receives duration in seconds and monotonic timestamp arguments in milliseconds. `tick` derives remaining time from elapsed time rather than decrementing a counter. `rep` ticks first, rejecting repetitions at or beyond the buzzer. Event payloads snapshot scores; types cover start, reps, five-rep milestones, lead changes, ties, halftime, final ten seconds, and completion. Winner is a player index or `null` for a versus draw. Solo completion selects player zero. Reset clears match state and events.
+`GameEngine` receives a positive repetition goal and monotonic timestamp arguments in milliseconds. Each accepted `rep` increments one athlete, emits a score snapshot, and completes the match immediately when that athlete reaches the goal. Event types cover start, reps, five-rep milestones, halfway-to-goal, lead changes, ties, and completion. Winner is the first player to the selected goal; solo completion selects player zero. Reset clears match state and events.
 
-UI timers refresh independently from pose inference, so a lost camera does not stop match time. The browser may throttle background tabs; elapsed-time calculation catches up when execution resumes. There is no pause/resume feature.
+Arcade has no clock or duration rule. Lost tracking simply prevents new repetitions from being accepted until tracking is clear again. There is no pause/resume feature.
 
 ## Commentary and API
 

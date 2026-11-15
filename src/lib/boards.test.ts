@@ -9,7 +9,7 @@ const row = (extra: Partial<ScoreRow>): ScoreRow => ({
   consistency: 70,
   createdAt: "2026-01-01T00:00:00.000Z",
   exercise: "jumping-jacks",
-  challenge: "timed",
+  challenge: "reps",
   experience: "arcade",
   durationSec: 30,
   goalReps: null,
@@ -19,7 +19,7 @@ const row = (extra: Partial<ScoreRow>): ScoreRow => ({
 });
 
 describe("championship rankings", () => {
-  it("keeps 15, 30, and 60 second arcade boards apart", () => {
+  it("combines legacy durations on one repetition board", () => {
     const rows = [
       row({ id: 1, nickname: "short", durationSec: 15, reps: 8 }),
       row({ id: 2, nickname: "mid", durationSec: 30, reps: 20 }),
@@ -29,10 +29,9 @@ describe("championship rankings", () => {
       rankTop(rows, {
         exercise: "jumping-jacks",
         experience: "arcade",
-        challenge: "timed",
-        durationSec: 15,
+        challenge: "reps",
       }).map((item) => item.nickname),
-    ).toEqual(["short"]);
+    ).toEqual(["long", "mid", "short"]);
   });
 
   it("ranks arcade by reps and lets the earlier tie rank first", () => {
@@ -44,8 +43,7 @@ describe("championship rankings", () => {
     const ranked = rankTop(rows, {
       exercise: "jumping-jacks",
       experience: "arcade",
-      challenge: "timed",
-      durationSec: 30,
+      challenge: "reps",
     });
     expect(ranked.map((item) => item.nickname)).toEqual(["more", "earlier", "later"]);
   });
@@ -71,15 +69,13 @@ describe("championship rankings", () => {
       exercise: "arm-raises",
       experience: "coach",
       challenge: "form",
-      goalReps: 4,
-      target: 60,
     });
     expect(ranked).toHaveLength(10);
     expect(ranked[0].average).toBe(61);
     expect(ranked[0].reps).toBeLessThanOrEqual(6);
   });
 
-  it("does not mix consistency with form or a different range target", () => {
+  it("keeps challenges separate while combining targets and repetition goals", () => {
     const rows = [
       row({
         id: 1,
@@ -100,10 +96,11 @@ describe("championship rankings", () => {
         exercise: "squats",
         experience: "coach",
         challenge: "consistency",
-        goalReps: 6,
+        goalReps: 8,
+        reps: 8,
         target: 60,
         durationSec: null,
-        consistency: 99,
+        consistency: 10,
       }),
       row({
         id: 3,
@@ -123,13 +120,11 @@ describe("championship rankings", () => {
         exercise: "squats",
         experience: "coach",
         challenge: "consistency",
-        goalReps: 6,
-        target: 35,
       }).map((item) => item.nickname),
-    ).toEqual(["steady"]);
+    ).toEqual(["other-range", "steady"]);
   });
 
-  it("leaves unknown settings off the board", () => {
+  it("does not require repetition-goal metadata or a minimum rep count", () => {
     const rows = [
       row({
         id: 1,
@@ -138,6 +133,7 @@ describe("championship rankings", () => {
         experience: "coach",
         challenge: "form",
         goalReps: null,
+        reps: 1,
         target: 60,
         durationSec: null,
         average: 99,
@@ -148,10 +144,8 @@ describe("championship rankings", () => {
         exercise: "arm-raises",
         experience: "coach",
         challenge: "form",
-        goalReps: 4,
-        target: 60,
-      }),
-    ).toHaveLength(0);
+      }).map((item) => item.nickname),
+    ).toEqual(["legacy"]);
   });
 
   it("breaks an equal quality score with consistency and keeps another scoring version off the board", () => {
@@ -201,8 +195,6 @@ describe("championship rankings", () => {
         exercise: "arm-raises",
         experience: "coach",
         challenge: "form",
-        goalReps: 4,
-        target: 60,
       }).map((item) => item.nickname),
     ).toEqual(["steady", "shaky"]);
   });

@@ -1,6 +1,6 @@
 # Everyday League
 
-Big-league energy. Everyday athletes. A local web app with two modes: a timed sports broadcast, and a guided movement coach that scores control instead of speed.
+Big-league energy. Everyday athletes. A local web app with two rep-count modes: an arcade race to a selected repetition goal, and a guided movement coach that scores control instead of speed.
 
 Built for SanD Hacks, November 14–15, 2026. Coaching work is on the local branch `feature/gamified-coaching` and is not committed. Do not commit, push, or deploy unless you are asked to.
 
@@ -17,11 +17,11 @@ npm run dev
 
 Open http://localhost:3000 in desktop Chrome.
 
-- **Start Broadcasting** keeps the timed jumping-jack or arm-raise match. Demo Mode needs no camera.
+- **Start Broadcasting** runs a first-to-5, 10, or 15 jumping-jack or arm-raise match. Demo Mode needs no camera.
 - **Guided Coach** scores arm raises or conservative squats for control, your selected range, and consistency.
 - **Progress** shows sessions saved in this browser.
 
-Use a 15-second arcade match or a 4-rep coached demo for a quick walkthrough. The MediaPipe Lite model and WASM assets are served from `public/mediapipe`. Inference runs in the browser. Camera footage is never sent to ElevenLabs, Neon, or an LLM.
+Use a first-to-5 arcade match or a 4-rep coached demo for a quick walkthrough. The MediaPipe Lite model and WASM assets are served from `public/mediapipe`. Inference runs in the browser. Camera footage is never sent to ElevenLabs, Neon, or an LLM.
 
 ## Voice configuration
 
@@ -35,7 +35,7 @@ Only commentary text and the selected personality reach ElevenLabs. Names inside
 
 ## Application flow
 
-- **Arcade:** landing → setup → calibration → countdown → timed match → results. A full held closed → open → closed cycle scores one rep.
+- **Arcade:** landing → setup → calibration → countdown → first-to-goal match → results. A full held closed → open → closed cycle scores one rep.
 - **Guided coach:** exercise → generated skeleton demo → calibrate a comfortable target → scored set → results → progress. Quality uses control (40%), selected range (30%), visible alignment (20%), and consistency (10%). Going past the selected target does not score higher. Unclear reps stay unscored.
 - Jumping jacks need shoulders, wrists, hips, and ankles. Arcade arm raises need shoulders and wrists. Coached squats need hips, knees, and feet, and depth is approximate from one camera.
 - Live two-player matches register player 1 alone, then player 2. Player 1 starts on the left of the mirrored preview. Crossing pauses identity. This is not face recognition.
@@ -62,8 +62,9 @@ Next.js App Router, React, TypeScript, Tailwind CSS, Lucide, MediaPipe Tasks Vis
 
 - `src/app/page.tsx`: arcade broadcast, live registration, and the coach entry.
 - `src/components/coach-flow.tsx`: guided session, calibration, and results.
-- `src/components/vision-stage.tsx`: webcam, arcade demo, coach demo, ghost skeleton.
-- `src/lib/engine.ts`: arcade detectors, lane tracking, timed scores.
+- `src/components/vision-stage.tsx`: webcam plus arcade and coach pose detection.
+- `src/components/pose-avatar.tsx`: split-screen movement avatar and target feedback.
+- `src/lib/engine.ts`: arcade detectors, lane tracking, and rep-goal scoring.
 - `src/lib/form.ts`: geometric quality scoring.
 - `src/lib/identity.ts`: sequential registration.
 - `src/lib/commentary.ts`: personalities, queue, playback, fallback.

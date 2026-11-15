@@ -60,21 +60,25 @@ export const COACHES = [
   {
     id: "supportive",
     name: "Supportive Coach",
+    voiceName: "Sarah",
     detail: "Warm and patient. Progress gets the praise.",
   },
   {
     id: "drill",
     name: "Drill Sergeant",
+    voiceName: "Callum",
     detail: "Gravelly, loud, and funny. Control over speed.",
   },
   {
     id: "hype",
     name: "Hype Commentator",
+    voiceName: "Charlie",
     detail: "Sports announcer. Gets loud for a sharp rep.",
   },
   {
     id: "calm",
     name: "Calm Instructor",
+    voiceName: "River",
     detail: "Slow, clear cues. No extra excitement.",
   },
 ] as const;

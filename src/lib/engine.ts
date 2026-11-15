@@ -209,8 +209,7 @@ export type GameEventType =
   | "PLAYER_TAKES_LEAD"
   | "SCORE_TIED"
   | "MILESTONE"
-  | "HALF_TIME"
-  | "FINAL_TEN_SECONDS"
+  | "HALFWAY_TO_GOAL"
   | "MATCH_FINISHED";
 export type GameEvent = {
   id: string;
@@ -223,23 +222,19 @@ export class GameEngine {
   state: "idle" | "active" | "complete" = "idle";
   scores: number[];
   events: GameEvent[] = [];
-  remaining: number;
   winner: number | null = null;
-  private startedAt = 0;
   private lastTime = 0;
-  private half = false;
-  private finalTen = false;
-  readonly duration: number;
+  private halfway = new Set<number>();
+  readonly goal: number;
   readonly players: string[];
-  constructor(options: { duration: number; players: string[] }) {
-    this.duration = Math.max(
+  constructor(options: { goal: number; players: string[] }) {
+    this.goal = Math.max(
       1,
-      Number.isFinite(options.duration) ? options.duration : 30,
+      Math.round(Number.isFinite(options.goal) ? options.goal : 10),
     );
     this.players = options.players.slice(0, 2);
     if (!this.players.length) this.players = ["Player 1"];
     this.scores = this.players.map(() => 0);
-    this.remaining = this.duration;
   }
   private emit(type: GameEventType, timestamp: number, player?: number) {
     this.events.push({
@@ -253,45 +248,11 @@ export class GameEngine {
   start(timestamp: number) {
     if (this.state !== "idle" || !Number.isFinite(timestamp)) return;
     this.state = "active";
-    this.startedAt = this.lastTime = timestamp;
-    this.emit("MATCH_STARTED", timestamp);
-  }
-  tick(timestamp: number) {
-    if (
-      this.state !== "active" ||
-      !Number.isFinite(timestamp) ||
-      timestamp < this.lastTime
-    )
-      return;
     this.lastTime = timestamp;
-    this.remaining = Math.max(
-      0,
-      this.duration - (timestamp - this.startedAt) / 1000,
-    );
-    if (!this.half && this.remaining <= this.duration / 2) {
-      this.half = true;
-      this.emit("HALF_TIME", timestamp);
-    }
-    if (!this.finalTen && this.remaining <= 10) {
-      this.finalTen = true;
-      this.emit("FINAL_TEN_SECONDS", timestamp);
-    }
-    if (this.remaining === 0) {
-      this.state = "complete";
-      this.winner =
-        this.scores.length === 1
-          ? 0
-          : this.scores[0] === this.scores[1]
-            ? null
-            : this.scores[0] > this.scores[1]
-              ? 0
-              : 1;
-      this.emit("MATCH_FINISHED", timestamp, this.winner ?? undefined);
-    }
+    this.emit("MATCH_STARTED", timestamp);
   }
   rep(player: number, timestamp: number) {
     if (!Number.isFinite(timestamp) || timestamp < this.lastTime) return;
-    this.tick(timestamp);
     if (
       this.state !== "active" ||
       !Number.isInteger(player) ||
@@ -299,28 +260,39 @@ export class GameEngine {
       player >= this.scores.length
     )
       return;
+    this.lastTime = timestamp;
     const previous =
       this.scores.length === 2 ? Math.sign(this.scores[0] - this.scores[1]) : 0;
     this.scores[player]++;
     this.emit("REP_COMPLETED", timestamp, player);
     if (this.scores[player] % 5 === 0)
       this.emit("MILESTONE", timestamp, player);
+    if (
+      !this.halfway.has(player) &&
+      this.scores[player] >= Math.ceil(this.goal / 2)
+    ) {
+      this.halfway.add(player);
+      this.emit("HALFWAY_TO_GOAL", timestamp, player);
+    }
     if (this.scores.length === 2) {
       const next = Math.sign(this.scores[0] - this.scores[1]);
       if (next === 0) this.emit("SCORE_TIED", timestamp);
       else if (next !== previous)
         this.emit("PLAYER_TAKES_LEAD", timestamp, next > 0 ? 0 : 1);
     }
+    if (this.scores[player] >= this.goal) {
+      this.state = "complete";
+      this.winner = player;
+      this.emit("MATCH_FINISHED", timestamp, player);
+    }
   }
   reset() {
     this.state = "idle";
     this.scores = this.players.map(() => 0);
     this.events = [];
-    this.remaining = this.duration;
     this.winner = null;
-    this.half = false;
-    this.finalTen = false;
-    this.startedAt = this.lastTime = 0;
+    this.halfway.clear();
+    this.lastTime = 0;
   }
 }
 /** Normalized, explicitly synthetic body fixture shared by demo and tests. */

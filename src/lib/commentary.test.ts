@@ -97,7 +97,11 @@ describe("coach personalities", () => {
     expect(previews[0]).toMatch(/supportive coach/i);
     expect(previews[1]).toMatch(/Drill sergeant/i);
     expect(previews[2]).toMatch(/Hype commentator/i);
-    expect(previews[3]).toMatch(/Calm instructor/);
+    expect(previews[3]).toMatch(/Calm instructor/i);
+    expect(previews[0]).toMatch(/Sarah/);
+    expect(previews[1]).toMatch(/Callum/);
+    expect(previews[2]).toMatch(/Charlie/);
+    expect(previews[3]).toMatch(/River/);
     expect(
       coachCommentary({
         type: "rep",

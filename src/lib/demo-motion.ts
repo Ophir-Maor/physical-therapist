@@ -44,10 +44,3 @@ export function demoFrame(
   const asymmetry = style === "rushed" ? -24 * open : 0;
   return { pose: armPose(open * peak, center, asymmetry), style };
 }
-
-export function ghostFrame(exercise: ExerciseId, progress: number, center = 0.5) {
-  const amount = Math.max(0, Math.min(1, progress));
-  return exercise === "squats"
-    ? squatPose(amount * 50, center)
-    : armPose(amount * 120, center);
-}

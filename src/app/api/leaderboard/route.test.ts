@@ -144,7 +144,7 @@ describe("neon leaderboard round trip", () => {
     ).toHaveLength(1);
     const listed = await GET(
       new Request(
-        "http://localhost:3000/api/leaderboard?exercise=arm-raises&challenge=form&experience=coach&goal=4&target=64",
+        "http://localhost:3000/api/leaderboard?exercise=arm-raises&challenge=form&experience=coach",
       ),
     );
     const listedBody = await listed.json();
@@ -160,13 +160,13 @@ describe("neon leaderboard round trip", () => {
           nickname: `s-${shortKey.slice(0, 6)}`,
           submissionKey: shortKey,
           exercise: "jumping-jacks",
-          challenge: "timed",
+          challenge: "reps",
           experience: "arcade",
           average: null,
           reps: 7,
           target: null,
-          durationSec: 15,
-          goalReps: null,
+          durationSec: 0,
+          goalReps: 5,
         }),
       }),
     );
@@ -177,28 +177,27 @@ describe("neon leaderboard round trip", () => {
           nickname: `l-${longKey.slice(0, 6)}`,
           submissionKey: longKey,
           exercise: "jumping-jacks",
-          challenge: "timed",
+          challenge: "reps",
           experience: "arcade",
           average: null,
           reps: 40,
           target: null,
-          durationSec: 30,
-          goalReps: null,
+          durationSec: 0,
+          goalReps: 10,
         }),
       }),
     );
     expect((await short.json()).submitted).toBe(true);
     expect((await long.json()).submitted).toBe(true);
-    const fifteen = await GET(
+    const arcade = await GET(
       new Request(
-        "http://localhost:3000/api/leaderboard?exercise=jumping-jacks&challenge=timed&experience=arcade&duration=15",
+        "http://localhost:3000/api/leaderboard?exercise=jumping-jacks&challenge=reps&experience=arcade",
       ),
     );
-    const fifteenBody = await fifteen.json();
-    expect(fifteenBody.entries.length).toBeLessThanOrEqual(10);
-    expect(fifteenBody.entries.some((entry: { nickname: string }) => entry.nickname.startsWith("l-"))).toBe(
-      false,
-    );
+    const arcadeBody = await arcade.json();
+    expect(arcadeBody.entries.length).toBeLessThanOrEqual(10);
+    expect(arcadeBody.entries.some((entry: { nickname: string }) => entry.nickname.startsWith("s-"))).toBe(true);
+    expect(arcadeBody.entries.some((entry: { nickname: string }) => entry.nickname.startsWith("l-"))).toBe(true);
     } finally {
       const sql = getSql();
       await sql`delete from leaderboard where submission_key = ${submissionKey}`;
@@ -218,7 +217,7 @@ describe("leaderboard filters", () => {
     process.env.DATABASE_URL = "postgres://invalid:invalid@127.0.0.1:1/none";
     const failed = await GET(
       new Request(
-        "http://localhost:3000/api/leaderboard?exercise=jumping-jacks&challenge=timed&experience=arcade&duration=15",
+        "http://localhost:3000/api/leaderboard?exercise=jumping-jacks&challenge=reps&experience=arcade",
       ),
     );
     const failedBody = await failed.json();

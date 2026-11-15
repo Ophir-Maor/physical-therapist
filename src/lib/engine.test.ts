@@ -73,9 +73,9 @@ it("jumping jacks require separated ankles; arm raises do not require legs", () 
   expect(hold(jack, false, 800)).toBe(0);
   expect(hold(arm, false, 800)).toBe(1);
 });
-describe("game clock and scoring", () => {
+describe("rep-goal game scoring", () => {
   it("scores, emits lead changes, ties and milestones", () => {
-    const g = new GameEngine({ duration: 30, players: ["A", "B"] });
+    const g = new GameEngine({ goal: 10, players: ["A", "B"] });
     g.start(1000);
     g.rep(0, 1100);
     g.rep(1, 1200);
@@ -92,40 +92,38 @@ describe("game clock and scoring", () => {
     g.rep(1, 1600);
     expect(g.events.filter((e) => e.type === "MILESTONE")).toHaveLength(1);
   });
-  it("uses elapsed time, emits timing events once, and excludes buzzer reps", () => {
-    const g = new GameEngine({ duration: 30, players: ["A", "B"] });
+  it("ends as soon as a player reaches the repetition goal", () => {
+    const g = new GameEngine({ goal: 3, players: ["A", "B"] });
     g.start(1000);
     g.rep(0, 2000);
-    g.tick(16000);
-    expect(g.remaining).toBe(15);
-    g.tick(21000);
-    g.tick(22000);
-    g.rep(1, 31000);
+    g.rep(1, 3000);
+    g.rep(0, 4000);
+    expect(g.events.filter((e) => e.type === "HALFWAY_TO_GOAL")).toHaveLength(1);
+    g.rep(0, 5000);
+    g.rep(1, 6000);
     expect(g.state).toBe("complete");
-    expect(g.scores).toEqual([1, 0]);
+    expect(g.scores).toEqual([3, 1]);
     expect(g.winner).toBe(0);
-    for (const type of ["HALF_TIME", "FINAL_TEN_SECONDS", "MATCH_FINISHED"])
-      expect(g.events.filter((e) => e.type === type)).toHaveLength(1);
+    expect(g.events.filter((e) => e.type === "MATCH_FINISHED")).toHaveLength(1);
   });
-  it("handles ties, practice, reset and stale timestamps", () => {
-    const g = new GameEngine({ duration: 1, players: ["A", "B"] });
+  it("handles solo practice, reset and stale timestamps", () => {
+    const g = new GameEngine({ goal: 1, players: ["A", "B"] });
     g.start(0);
-    g.tick(1000);
-    expect(g.winner).toBeNull();
+    g.rep(0, 1000);
+    expect(g.winner).toBe(0);
     g.reset();
     expect(g.events).toEqual([]);
-    expect(g.remaining).toBe(1);
     g.start(2000);
     g.rep(0, 2100);
     g.rep(1, 2050);
     expect(g.scores).toEqual([1, 0]);
-    const solo = new GameEngine({ duration: 1, players: ["A"] });
+    const solo = new GameEngine({ goal: 1, players: ["A"] });
     solo.start(0);
-    solo.tick(1000);
+    solo.rep(0, 1000);
     expect(solo.winner).toBe(0);
   });
   it("snapshots event scores without subsequent mutation", () => {
-    const g = new GameEngine({ duration: 30, players: ["A"] });
+    const g = new GameEngine({ goal: 5, players: ["A"] });
     g.start(0);
     g.rep(0, 1);
     expect(g.events[0].scores).toEqual([0]);
